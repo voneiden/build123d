@@ -1827,7 +1827,7 @@ class Plane:
             )
             return_value = BoundBox(local_bbox)
         elif hasattr(obj, "wrapped"):  # Shapes
-            return_value = obj.transform_shape(transform_matrix)
+            return_value = obj.transform_shape(transform_matrix, skip_copy=True)
         else:
             raise ValueError(
                 f"Unable to repositioned type {type(obj)} with respect to local coordinates"

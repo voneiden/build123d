@@ -2151,7 +2151,7 @@ class Shape(NodeMixin):
         )
         return copy.deepcopy(self, None)
 
-    def transform_shape(self, t_matrix: Matrix) -> Shape:
+    def transform_shape(self, t_matrix: Matrix, skip_copy=False) -> Shape:
         """Apply affine transform without changing type
 
         Transforms a copy of this Shape by the provided 3D affine transformation matrix.
@@ -2170,6 +2170,8 @@ class Shape(NodeMixin):
             transformed = Shape.cast(
                 BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
             )
+            if skip_copy:
+                return transformed
             new_shape = copy.deepcopy(self, None)
             new_shape.wrapped = transformed.wrapped
 
