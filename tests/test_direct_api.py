@@ -2982,6 +2982,51 @@ class TestShape(DirectApiTestCase):
         self.assertLess(s2.volume, s.volume)
         self.assertGreater(s2.volume, 0.0)
 
+    def test_split_by_perimeter(self):
+        # Test 0 - extract a spherical cap
+        target0 = Solid.make_sphere(10).rotate(Axis.Z, 90)
+        circle = Plane.YZ.offset(15) * Circle(5).face()
+        circle_projected = circle.project_to_shape(target0, (-1, 0, 0))[0]
+        circle_outerwire = circle_projected.edge()
+        inside0, outside0 = target0.split_by_perimeter(circle_outerwire)
+        self.assertLess(inside0.area, outside0.area)
+
+        # Test 1 - extract ring of a sphere
+        ring = Pos(Z=15) * (Circle(5) - Circle(3)).face()
+        ring_projected = ring.project_to_shape(target0, (0, 0, -1))[0]
+        ring_outerwire = ring_projected.outer_wire()
+        inside1, outside1 = target0.split_by_perimeter(ring_outerwire)
+        self.assertLess(inside1.area, outside1.area)
+        self.assertEqual(len(outside1.faces()), 2)
+
+        # Test 2 - extract multiple faces
+        with BuildPart() as cross:
+            with BuildSketch(Pos(Z=-5) * Rot(Z=-45)) as skt:
+                Rectangle(5, 1, align=Align.MIN)
+                Rectangle(1, 5, align=Align.MIN)
+                fillet(skt.vertices(), 0.3)
+            extrude(amount=10)
+        target2 = cross.part
+        square = Face.make_rect(3, 3, Plane((12, 0, 0), z_dir=(1, 0, 0)))
+        square_projected = square.project_to_shape(cross.part, (-1, 0, 0))[0]
+        projected_edges = square_projected.edges().sort_by(SortBy.DISTANCE)[2:]
+        projected_perimeter = Wire(projected_edges)
+        inside2, outside2 = target2.split_by_perimeter(projected_perimeter)
+        self.assertTrue(isinstance(inside2, Sketch))
+
+        # Test 3 - Invalid, wire on shape edge
+        target3 = Solid.make_cylinder(5, 10, Plane((0, 0, -5)))
+        square_projected = square.project_to_shape(target3, (-1, 0, 0))[0].unwrap(
+            fully=True
+        )
+        project_perimeter = square_projected.outer_wire()
+        inside3, outside3 = target3.split_by_perimeter(project_perimeter)
+        self.assertIsNone(inside3)
+
+        # Test 4 - invalid inputs
+        with self.assertRaises(ValueError):
+            _, _ = target2.split_by_perimeter(projected_perimeter.edges()[0])
+
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))
         sphere2 = Solid.make_sphere(1, Plane((5, 0, 0)))

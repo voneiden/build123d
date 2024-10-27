@@ -2780,6 +2780,61 @@ class Shape(NodeMixin):
 
         return result.unwrap(fully=True)
 
+    def split_by_perimeter(
+        self, perimeter: Union[Edge, Wire]
+    ) -> tuple[Union[Sketch, Face, None], Union[Sketch, Face, None]]:
+        """split_by_perimeter
+
+        Divide the faces of this object into those within the perimeter
+        and those outside the perimeter.
+
+        Note: this method may fail if the perimeter intersects shape edges.
+
+        Args:
+            perimeter (Union[Edge,Wire]): closed perimeter
+
+        Raises:
+            ValueError: perimeter must be closed
+
+        Returns:
+            tuple[Union[Sketch, Face, None], Union[Sketch, Face, None]]: inside and outside
+        """
+
+        def get(los: TopTools_ListOfShape, shape_cls) -> list:
+            shapes = []
+            for _ in range(los.Size()):
+                shapes.append(shape_cls(los.First()))
+                los.RemoveFirst()
+            return shapes
+
+        # Process the perimeter
+        if not perimeter.is_closed:
+            raise ValueError("perimeter must be a closed Wire or Edge")
+        perimeter_edges = TopTools_SequenceOfShape()
+        for perimeter_edge in perimeter.edges():
+            perimeter_edges.Append(perimeter_edge.wrapped)
+
+        # Split the faces by the perimeter edges
+        lefts, rights = [], []
+        for target_face in self.faces():
+            constructor = BRepFeat_SplitShape(target_face.wrapped)
+            constructor.Add(perimeter_edges)
+            constructor.Build()
+            lefts.extend(get(constructor.Left(), Face))
+            rights.extend(get(constructor.Right(), Face))
+
+        left = Sketch(lefts).unwrap(fully=True) if lefts else None
+        right = Sketch(rights).unwrap(fully=True) if rights else None
+
+        # Is left or right the inside?
+        perimeter_length = perimeter.length
+        left_perimeter_length = sum(e.length for e in left.edges()) if lefts else 0
+        right_perimeter_length = sum(e.length for e in right.edges()) if rights else 0
+        left_inside = abs(perimeter_length - left_perimeter_length) < abs(
+            perimeter_length - right_perimeter_length
+        )
+        return (left, right) if left_inside else (right, left)
+
     def distance(self, other: Shape) -> float:
         """Minimal distance between two shapes
 
