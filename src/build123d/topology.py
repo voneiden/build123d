@@ -2780,15 +2780,25 @@ class Shape(NodeMixin):
 
         return result.unwrap(fully=True)
 
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Union[Edge, Wire], keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
+    ) -> Union[Optional[Shell], Optional[Face]]: ...
+
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Union[Edge, Wire], keep: Literal[Keep.BOTH]
+    ) -> tuple[
+        Union[Optional[Shell], Optional[Face]],
+        Union[Optional[Shell], Optional[Face]],
+    ]: ...
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Union[Edge, Wire]
+    ) -> Union[Optional[Shell], Optional[Face]]: ...
     def split_by_perimeter(
         self, perimeter: Union[Edge, Wire], keep: Keep = Keep.INSIDE
-    ) -> Union[
-        Union[Optional[Shell], Optional[Face]],
-        tuple[
-            Union[Optional[Shell], Optional[Face]],
-            Union[Optional[Shell], Optional[Face]],
-        ],
-    ]:
+    ):
         """split_by_perimeter
 
         Divide the faces of this object into those within the perimeter
@@ -2805,9 +2815,15 @@ class Shape(NodeMixin):
             ValueError: keep must be one of Keep.INSIDE|OUTSIDE|BOTH
 
         Returns:
-            Union[Union[Optional[Shell], Optional[Face]],tuple[Union[Optional[Shell],
-            Optional[Face]],Union[Optional[Shell], Optional[Face]]]:]: either inside,
-            outside or both
+            Union[Optional[Shell], Optional[Face],
+            Tuple[Optional[Shell], Optional[Face]]]: The result of the split operation.
+
+            - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or `None`
+              if no inside part is found.
+            - **Keep.OUTSIDE**: Returns the outside part as a `Shell` or `Face`, or `None`
+              if no outside part is found.
+            - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
+              either a `Shell`, `Face`, or `None` if no corresponding part is found.
 
         """
 
