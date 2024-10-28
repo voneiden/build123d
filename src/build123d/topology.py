@@ -2781,8 +2781,14 @@ class Shape(NodeMixin):
         return result.unwrap(fully=True)
 
     def split_by_perimeter(
-        self, perimeter: Union[Edge, Wire]
-    ) -> tuple[Union[Sketch, Face, None], Union[Sketch, Face, None]]:
+        self, perimeter: Union[Edge, Wire], keep: Keep = Keep.INSIDE
+    ) -> Union[
+        Union[Optional[Shell], Optional[Face]],
+        tuple[
+            Union[Optional[Shell], Optional[Face]],
+            Union[Optional[Shell], Optional[Face]],
+        ],
+    ]:
         """split_by_perimeter
 
         Divide the faces of this object into those within the perimeter
@@ -2792,12 +2798,17 @@ class Shape(NodeMixin):
 
         Args:
             perimeter (Union[Edge,Wire]): closed perimeter
+            keep (Keep, optional): which object(s) to return. Defaults to Keep.INSIDE.
 
         Raises:
             ValueError: perimeter must be closed
+            ValueError: keep must be one of Keep.INSIDE|OUTSIDE|BOTH
 
         Returns:
-            tuple[Union[Sketch, Face, None], Union[Sketch, Face, None]]: inside and outside
+            Union[Union[Optional[Shell], Optional[Face]],tuple[Union[Optional[Shell],
+            Optional[Face]],Union[Optional[Shell], Optional[Face]]]:]: either inside,
+            outside or both
+
         """
 
         def get(los: TopTools_ListOfShape, shape_cls) -> list:
@@ -2807,6 +2818,11 @@ class Shape(NodeMixin):
                 los.RemoveFirst()
             return shapes
 
+        if keep not in {Keep.INSIDE, Keep.OUTSIDE, Keep.BOTH}:
+            raise ValueError(
+                "keep must be one of Keep.INSIDE, Keep.OUTSIDE, or Keep.BOTH"
+            )
+
         # Process the perimeter
         if not perimeter.is_closed:
             raise ValueError("perimeter must be a closed Wire or Edge")
@@ -2815,7 +2831,8 @@ class Shape(NodeMixin):
             perimeter_edges.Append(perimeter_edge.wrapped)
 
         # Split the faces by the perimeter edges
-        lefts, rights = [], []
+        lefts: list[Face] = []
+        rights: list[Face] = []
         for target_face in self.faces():
             constructor = BRepFeat_SplitShape(target_face.wrapped)
             constructor.Add(perimeter_edges)
@@ -2823,17 +2840,26 @@ class Shape(NodeMixin):
             lefts.extend(get(constructor.Left(), Face))
             rights.extend(get(constructor.Right(), Face))
 
-        left = Sketch(lefts).unwrap(fully=True) if lefts else None
-        right = Sketch(rights).unwrap(fully=True) if rights else None
+        left = None if not lefts else lefts[0] if len(lefts) == 1 else Shell(lefts)
+        right = None if not rights else rights[0] if len(rights) == 1 else Shell(rights)
 
         # Is left or right the inside?
         perimeter_length = perimeter.length
-        left_perimeter_length = sum(e.length for e in left.edges()) if lefts else 0
-        right_perimeter_length = sum(e.length for e in right.edges()) if rights else 0
+        left_perimeter_length = (
+            sum(e.length for e in left.edges()) if not left is None else 0
+        )
+        right_perimeter_length = (
+            sum(e.length for e in right.edges()) if not right is None else 0
+        )
         left_inside = abs(perimeter_length - left_perimeter_length) < abs(
             perimeter_length - right_perimeter_length
         )
-        return (left, right) if left_inside else (right, left)
+        if keep == Keep.BOTH:
+            return (left, right) if left_inside else (right, left)
+        elif keep == Keep.INSIDE:
+            return left if left_inside else right
+        else:  # keep == Keep.OUTSIDE:
+            return right if left_inside else left
 
     def distance(self, other: Shape) -> float:
         """Minimal distance between two shapes

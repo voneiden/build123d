@@ -25,7 +25,7 @@ Studio Code and the ocp-vscode viewer extension in a timed event from the TooTal
 `build123d entry video <https://www.youtube.com/watch?v=UhUmMInlJic>`_
 
 cq-editor fork
-=========
+==============
 
 GUI editor based on PyQT. This fork has changes from jdegenstein to allow easier use with build123d.
 

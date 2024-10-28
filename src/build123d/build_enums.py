@@ -165,6 +165,8 @@ class Keep(Enum):
 
     TOP = auto()
     BOTTOM = auto()
+    INSIDE = auto()
+    OUTSIDE = auto()
     BOTH = auto()
 
     def __repr__(self):

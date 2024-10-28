@@ -2988,14 +2988,14 @@ class TestShape(DirectApiTestCase):
         circle = Plane.YZ.offset(15) * Circle(5).face()
         circle_projected = circle.project_to_shape(target0, (-1, 0, 0))[0]
         circle_outerwire = circle_projected.edge()
-        inside0, outside0 = target0.split_by_perimeter(circle_outerwire)
+        inside0, outside0 = target0.split_by_perimeter(circle_outerwire, Keep.BOTH)
         self.assertLess(inside0.area, outside0.area)
 
         # Test 1 - extract ring of a sphere
         ring = Pos(Z=15) * (Circle(5) - Circle(3)).face()
         ring_projected = ring.project_to_shape(target0, (0, 0, -1))[0]
         ring_outerwire = ring_projected.outer_wire()
-        inside1, outside1 = target0.split_by_perimeter(ring_outerwire)
+        inside1, outside1 = target0.split_by_perimeter(ring_outerwire, Keep.BOTH)
         self.assertLess(inside1.area, outside1.area)
         self.assertEqual(len(outside1.faces()), 2)
 
@@ -3011,8 +3011,8 @@ class TestShape(DirectApiTestCase):
         square_projected = square.project_to_shape(cross.part, (-1, 0, 0))[0]
         projected_edges = square_projected.edges().sort_by(SortBy.DISTANCE)[2:]
         projected_perimeter = Wire(projected_edges)
-        inside2, outside2 = target2.split_by_perimeter(projected_perimeter)
-        self.assertTrue(isinstance(inside2, Sketch))
+        inside2 = target2.split_by_perimeter(projected_perimeter, Keep.INSIDE)
+        self.assertTrue(isinstance(inside2, Shell))
 
         # Test 3 - Invalid, wire on shape edge
         target3 = Solid.make_cylinder(5, 10, Plane((0, 0, -5)))
@@ -3020,12 +3020,17 @@ class TestShape(DirectApiTestCase):
             fully=True
         )
         project_perimeter = square_projected.outer_wire()
-        inside3, outside3 = target3.split_by_perimeter(project_perimeter)
+        inside3 = target3.split_by_perimeter(project_perimeter, Keep.INSIDE)
         self.assertIsNone(inside3)
+        outside3 = target3.split_by_perimeter(project_perimeter, Keep.OUTSIDE)
+        self.assertAlmostEqual(outside3.area, target3.shell().area, 5)
 
         # Test 4 - invalid inputs
         with self.assertRaises(ValueError):
-            _, _ = target2.split_by_perimeter(projected_perimeter.edges()[0])
+            _, _ = target2.split_by_perimeter(projected_perimeter.edges()[0], Keep.BOTH)
+
+        with self.assertRaises(ValueError):
+            _, _ = target3.split_by_perimeter(projected_perimeter, Keep.TOP)
 
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))
