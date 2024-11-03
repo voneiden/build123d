@@ -6093,9 +6093,12 @@ class Face(Shape):
         """make_surface_from_array_of_points
 
         Approximate a spline surface through the provided 2d array of points.
+        The first list correspond to points on the vertical direction in the parameter space of the face.
+        The second list correspond to points on the horizontal direction in the parameter space of the face.
+        The 2 lists are UV points of the parameter space of the face.
 
         Args:
-            points (list[list[VectorLike]]): a 2D list of points
+            points (list[list[VectorLike]]): a 2D list of points, first list is V parameters second is U parameters.
             tol (float, optional): tolerance of the algorithm. Defaults to 1e-2.
             smoothing (Tuple[float, float, float], optional): optional tuple of
                 3 weights use for variational smoothing. Defaults to None.
