@@ -1220,6 +1220,21 @@ class TestFace(DirectApiTestCase):
             extrude(amount=1)
         self.assertEqual(test.faces().sort_by(Axis.Z).last.geometry, "POLYGON")
 
+    def test_is_planar(self):
+        self.assertTrue(Face.make_rect(1, 1).is_planar)
+        self.assertFalse(
+            Solid.make_cylinder(1, 1).faces().filter_by(GeomType.CYLINDER)[0].is_planar
+        )
+        # Some of these faces have geom_type BSPLINE but are planar
+        mount = Solid.make_loft(
+            [
+                Rectangle((1 + 16 + 4), 20, align=(Align.MIN, Align.CENTER)).wire(),
+                Pos(1, 0, 4)
+                * Rectangle(16, 20, align=(Align.MIN, Align.CENTER)).wire(),
+            ],
+        )
+        self.assertTrue(all(f.is_planar for f in mount.faces()))
+
     def test_negate(self):
         square = Face.make_rect(1, 1)
         self.assertVectorAlmostEquals(square.normal_at(), (0, 0, 1), 5)

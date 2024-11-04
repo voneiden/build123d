@@ -181,6 +181,7 @@ from OCP.GeomFill import (
     GeomFill_Frenet,
     GeomFill_TrihedronLaw,
 )
+from OCP.GeomLib import GeomLib_IsPlanarSurface
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -3447,7 +3448,7 @@ class ShapeList(list[T]):
         # could be moved out maybe?
         def axis_parallel_predicate(axis: Axis, tolerance: float):
             def pred(shape: Shape):
-                if isinstance(shape, Face) and shape.geom_type == GeomType.PLANE:
+                if isinstance(shape, Face) and shape.is_planar:
                     shape_axis = Axis(shape.center(), shape.normal_at(None))
                 elif isinstance(shape, Edge) and shape.geom_type == GeomType.LINE:
                     shape_axis = Axis(shape.position_at(0), shape.tangent_at(0))
@@ -3462,7 +3463,7 @@ class ShapeList(list[T]):
             plane_xyz = plane.z_dir.wrapped.XYZ()
 
             def pred(shape: Shape):
-                if isinstance(shape, Face) and shape.geom_type == GeomType.PLANE:
+                if isinstance(shape, Face) and shape.is_planar:
                     shape_axis = Axis(shape.center(), shape.normal_at(None))
                     return plane_axis.is_parallel(shape_axis, tolerance)
                 if isinstance(shape, Wire):
@@ -5601,7 +5602,7 @@ class Face(Shape):
     def length(self) -> float:
         """length of planar face"""
         result = None
-        if self.geom_type == GeomType.PLANE:
+        if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.X)
@@ -5617,7 +5618,7 @@ class Face(Shape):
     def width(self) -> float:
         """width of planar face"""
         result = None
-        if self.geom_type == GeomType.PLANE:
+        if self.is_planar:
             # Reposition on Plane.XY
             flat_face = Plane(self).to_local_coords(self)
             face_vertices = flat_face.vertices().sort_by(Axis.Y)
@@ -5628,7 +5629,7 @@ class Face(Shape):
     def geometry(self) -> str:
         """geometry of planar face"""
         result = None
-        if self.geom_type == GeomType.PLANE:
+        if self.is_planar:
             flat_face = Plane(self).to_local_coords(self)
             flat_face_edges = flat_face.edges()
             if all([e.geom_type == GeomType.LINE for e in flat_face_edges]):
@@ -5660,6 +5661,13 @@ class Face(Shape):
         """Location at the center of face"""
         origin = self.position_at(0.5, 0.5)
         return Plane(origin, z_dir=self.normal_at(origin)).location
+
+    @property
+    def is_planar(face: Face) -> bool:
+        """Is the face planar even though its geom_type may not be PLANE"""
+        surface = BRep_Tool.Surface_s(face.wrapped)
+        is_face_planar = GeomLib_IsPlanarSurface(surface, TOLERANCE)
+        return is_face_planar.IsPlanar()
 
     def _geom_adaptor(self) -> Geom_Surface:
         """ """
@@ -5810,7 +5818,7 @@ class Face(Shape):
             Vector: center
         """
         if (center_of == CenterOf.MASS) or (
-            center_of == CenterOf.GEOMETRY and self.geom_type == GeomType.PLANE
+            center_of == CenterOf.GEOMETRY and self.is_planar
         ):
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(self.wrapped, properties)
@@ -7447,9 +7455,7 @@ class Solid(Mixin3D, Shape):
         clip_faces = [
             f
             for f in faces
-            if not (
-                f.geom_type == GeomType.PLANE and f.normal_at().dot(direction) == 0.0
-            )
+            if not (f.is_planar and f.normal_at().dot(direction) == 0.0)
         ]
         if not clip_faces:
             raise ValueError("provided face does not intersect target_object")
