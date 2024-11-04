@@ -224,6 +224,8 @@ class Builder(ABC):
         assert current_frame is not None
         assert current_frame.f_back is not None
         self._python_frame = current_frame.f_back.f_back
+        self._python_frame_code = self._python_frame.f_code
+        self.parent_frame = None
         self.builder_parent = None
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
         self.workplanes_context = None
@@ -280,7 +282,10 @@ class Builder(ABC):
                 "Transferring object(s) to %s", type(self.builder_parent).__name__
             )
             if self._obj is None and not sys.exc_info()[1]:
-                warnings.warn(f"{self._obj_name} is None - {self._tag} didn't create anything", stacklevel=2)
+                warnings.warn(
+                    f"{self._obj_name} is None - {self._tag} didn't create anything",
+                    stacklevel=2,
+                )
             self.builder_parent._add_to_context(self._obj, mode=self.mode)
 
         self.exit_workplanes = WorkplaneList._get_context().workplanes
