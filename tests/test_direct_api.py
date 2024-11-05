@@ -2556,6 +2556,17 @@ class TestPlane(DirectApiTestCase):
         with self.assertRaises(TypeError):
             Plane(Edge.make_line((0, 0), (0, 1)))
 
+        # can be instantiated from planar faces of different surface types
+        # this loft creates new faces of types Geom_Plane and Geom_BSplineSurface
+        lofted_solid = Solid.make_loft(
+            [
+                Rectangle(3, 1).wire(),
+                Pos(0, 0, 1) * Rectangle(1, 1).wire(),
+            ]
+        )
+        for f in lofted_solid.faces():
+            Plane(f)
+
     def test_plane_neg(self):
         p = Plane(
             origin=(1, 2, 3),
