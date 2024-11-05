@@ -4509,6 +4509,34 @@ class Compound(Mixin3D, Shape):
 
         return results
 
+    def first_level_shapes(
+        self, _shapes: list[TopoDS_Shape] = None
+    ) -> ShapeList[Shape]:
+        """first_level_shapes
+
+        This method iterates through the immediate children of the compound and
+        collects all non-compound shapes (e.g., vertices, edges, faces, solids).
+        If a child shape is itself a compound, the method recursively explores it,
+        retrieving all first-level shapes within any nested compounds.
+
+        Note: the _shapes parameter is not to be assigned by the user.
+
+        Returns:
+            ShapeList[Shape]: Shapes contained within the Compound
+        """
+        if _shapes is None:
+            _shapes = []
+        iterator = TopoDS_Iterator()
+        iterator.Initialize(self.wrapped)
+        while iterator.More():
+            child = Shape.cast(iterator.Value())
+            if isinstance(child, Compound):
+                child.first_level_shapes(_shapes)
+            else:
+                _shapes.append(child)
+            iterator.Next()
+        return ShapeList(_shapes)
+
     def unwrap(self, fully: bool = True) -> Union[Self, Shape]:
         """Strip unnecessary Compound wrappers
 

@@ -875,6 +875,13 @@ class TestCompound(DirectApiTestCase):
         comp4 = comp3.unwrap(fully=True)
         self.assertTrue(isinstance(comp4, Face))
 
+    def test_first_level_shapes(self):
+        base_shapes = Compound(children=PolarLocations(15, 20) * Box(4, 4, 4))
+        fls = base_shapes.first_level_shapes()
+        self.assertTrue(isinstance(fls, ShapeList))
+        self.assertEqual(len(fls), 20)
+        self.assertTrue(all(isinstance(s, Solid) for s in fls))
+
 
 class TestEdge(DirectApiTestCase):
     def test_close(self):
