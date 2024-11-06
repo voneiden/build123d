@@ -553,12 +553,14 @@ class AlgebraTests(unittest.TestCase):
     def test_empty_plus_part(self):
         b = Box(1, 2, 3)
         r = Part() + b
-        self.assertEqual(b.wrapped, r.wrapped)
+        self.assertAlmostEqual(b.volume, r.volume, 5)
+        self.assertEqual(r._dim, 3)
 
     def test_part_plus_empty(self):
         b = Box(1, 2, 3)
         r = b + Part()
-        self.assertEqual(b.wrapped, r.wrapped)
+        self.assertAlmostEqual(b.volume, r.volume, 5)
+        self.assertEqual(r._dim, 3)
 
     def test_empty_minus_part(self):
         b = Box(1, 2, 3)
@@ -585,12 +587,14 @@ class AlgebraTests(unittest.TestCase):
     def test_empty_plus_sketch(self):
         b = Rectangle(1, 2)
         r = Sketch() + b
-        self.assertEqual(b.wrapped, r.wrapped)
+        self.assertAlmostEqual(b.area, r.area, 5)
+        self.assertEqual(r._dim, 2)
 
     def test_sketch_plus_empty(self):
         b = Rectangle(1, 2)
         r = b + Sketch()
-        self.assertEqual(b.wrapped, r.wrapped)
+        self.assertAlmostEqual(b.area, r.area, 5)
+        self.assertEqual(r._dim, 2)
 
     def test_empty_minus_sketch(self):
         b = Rectangle(1, 2)
@@ -658,6 +662,79 @@ class AlgebraTests(unittest.TestCase):
         line = Line((0, 0), (1, 1))
         with self.assertRaises(ValueError):
             _ = rectangle - line
+
+    def test_compound_plus(self):
+        addend0 = Box(4, 4, 4)
+        addend1 = Box(1, 1, 8)
+        base_shapes = PolarLocations(15, 20) * addend0
+        addons = PolarLocations(16, 20) * addend1
+
+        p1 = Compound(base_shapes) + Compound(addons)
+        self.assertEqual(p1._dim, 3)
+        self.assertAlmostEqual(p1.volume, 20 * (4**3 + 1 * 1 * 4), 5)
+
+        with self.assertRaises(ValueError):
+            Compound(children=[addend0] + addend1.faces()) + Box(1, 1, 1)
+
+        with self.assertRaises(ValueError):
+            Box(1, 1, 1) + Compound(children=addend1.faces())
+
+    def test_compound_minus(self):
+        minuend = Box(4, 4, 4)
+        subtrahend = Box(1, 1, 4)
+        base_shapes = PolarLocations(15, 20) * minuend
+        holes = PolarLocations(17, 20) * subtrahend
+        s1 = Compound(base_shapes) - Compound(holes)
+        self.assertAlmostEqual(s1.volume, 20 * (16 - 0.5) * 4, 5)
+
+        s2 = minuend - subtrahend
+        self.assertEqual(s2._dim, 3)
+        self.assertAlmostEqual(s2.volume, (16 - 1) * 4, 5)
+
+        s3 = minuend.solid() - subtrahend.solid()
+        self.assertEqual(s3._dim, 3)
+        self.assertAlmostEqual(s3.volume, (16 - 1) * 4, 5)
+
+        s4 = Compound(minuend.faces()) - subtrahend
+        self.assertEqual(s4._dim, 2)
+        self.assertAlmostEqual(s4.area, 4 * 16 + 2 * (16 - 1), 5)
+
+        s5 = minuend.shell() - subtrahend
+        self.assertEqual(s5._dim, 2)
+        self.assertAlmostEqual(s5.area, 4 * 16 + 2 * (16 - 1), 5)
+
+        s6 = minuend - None
+        self.assertEqual(s6._dim, 3)
+        self.assertAlmostEqual(s6.volume, 4**3, 5)
+
+        s7 = minuend - Pos((8, 0, 0)) * subtrahend
+        self.assertEqual(s7._dim, 3)
+        self.assertAlmostEqual(s7.volume, 4**3, 5)
+
+        s8 = minuend - [subtrahend, Box(4, 1, 1)]
+        self.assertEqual(s8._dim, 3)
+        self.assertAlmostEqual(s8.volume, (16 - 1) * 4 - 1 * 3, 5)
+
+        s9 = Compound(children=[minuend]) - Compound(children=[subtrahend])
+        self.assertEqual(s9._dim, 3)
+        self.assertAlmostEqual(s9.volume, (16 - 1) * 4, 5)
+
+        s10 = Compound(minuend) - Compound(subtrahend)
+        self.assertEqual(s10._dim, 3)
+        self.assertAlmostEqual(s10.volume, (16 - 1) * 4, 5)
+
+        s11 = minuend.shell() - Compound(children=[subtrahend, Box(4, 1, 1)])
+        self.assertEqual(s11._dim, 2)
+        self.assertAlmostEqual(s11.area, 2 * 16 + 4 * (16 - 1), 5)
+
+        b1 = minuend.shell()
+        s12 = b1 - Compound(children=[subtrahend, b1.faces()[0]])
+        self.assertEqual(s12._dim, 2)
+        self.assertAlmostEqual(s12.area, 3 * 16 + 2 * (16 - 1), 5)
+        self.assertEqual(len(s12.faces()), 5)
+
+        with self.assertRaises(ValueError):
+            Compound(children=[minuend] + subtrahend.faces()) - Box(1, 1, 1)
 
 
 class LocationTests(unittest.TestCase):

@@ -1699,64 +1699,94 @@ class Shape(NodeMixin):
 
     def __add__(self, other: Union[list[Shape], Shape]) -> Self:
         """fuse shape to self operator +"""
-        others = other if isinstance(other, (list, tuple)) else [other]
+        # Convert `other` to list of base objects and filter out None values
+        summands = [
+            shape
+            for o in (other if isinstance(other, (list, tuple)) else [other])
+            if o is not None
+            for shape in (o.first_level_shapes() if isinstance(o, Compound) else [o])
+        ]
+        # If there is nothing to add return the original object
+        if not summands:
+            return self
 
-        if not all([type(other)._dim == type(self)._dim for other in others]):
+        # Check that all dimensions are the same
+        addend_dim = self._dim
+        if addend_dim is None:
+            raise ValueError("Dimensions of objects to add to are inconsistent")
+
+        if not all(summand._dim == addend_dim for summand in summands):
             raise ValueError("Only shapes with the same dimension can be added")
 
-        if self.wrapped is None:
-            if len(others) == 1:
-                new_shape = others[0]
+        if self.wrapped is None:  # an empty object
+            if len(summands) == 1:
+                sum_shape = summands[0]
             else:
-                new_shape = others[0].fuse(*others[1:])
-        elif isinstance(other, Shape) and other.wrapped is None:
-            new_shape = self
+                sum_shape = summands[0].fuse(*summands[1:])
         else:
-            new_shape = self.fuse(*others)
+            sum_shape = self.fuse(*summands)
+
+        # Simplify Compounds if possible
+        sum_shape = (
+            sum_shape.unwrap(fully=True)
+            if isinstance(sum_shape, Compound)
+            else sum_shape
+        )
 
         if SkipClean.clean:
-            new_shape = new_shape.clean()
+            sum_shape = sum_shape.clean()
 
-        if self._dim == 3:
-            new_shape = Part(new_shape.wrapped)
-        elif self._dim == 2:
-            new_shape = Sketch(new_shape.wrapped)
-        elif self._dim == 1:
-            new_shape = Curve(Compound(new_shape.edges()).wrapped)
+        # To allow the @, % and ^ operators to work 1D objects must be type Curve
+        if addend_dim == 1:
+            sum_shape = Curve(Compound(sum_shape.edges()).wrapped)
 
-        return new_shape
+        return sum_shape
 
-    def __sub__(self, other: Shape) -> Self:
+    def __sub__(self, other: Union[Shape, Iterable[Shape]]) -> Self:
         """cut shape from self operator -"""
-        others = other if isinstance(other, (list, tuple)) else [other]
 
-        for _other in others:
-            if type(_other)._dim < type(self)._dim:
-                raise ValueError(
-                    f"Only shapes with equal or greater dimension can be subtracted: "
-                    f"not {type(self).__name__} ({type(self)._dim}D) and "
-                    f"{type(_other).__name__} ({type(_other)._dim}D)"
-                )
-
-        new_shape = None
         if self.wrapped is None:
             raise ValueError("Cannot subtract shape from empty compound")
-        if isinstance(other, Shape) and other.wrapped is None:
-            new_shape = self
-        else:
-            new_shape = self.cut(*others)
 
-        if new_shape is not None and SkipClean.clean:
-            new_shape = new_shape.clean()
+        # Convert `other` to list of base objects and filter out None values
+        subtrahends = [
+            shape
+            for o in (other if isinstance(other, (list, tuple)) else [other])
+            if o is not None
+            for shape in (o.first_level_shapes() if isinstance(o, Compound) else [o])
+        ]
+        # If there is nothing to subtract return the original object
+        if not subtrahends:
+            return self
 
-        if self._dim == 3:
-            new_shape = Part(new_shape.wrapped)
-        elif self._dim == 2:
-            new_shape = Sketch(new_shape.wrapped)
-        elif self._dim == 1:
-            new_shape = Curve(Compound(new_shape.edges()).wrapped)
+        # Check that all dimensions are the same
+        minuend_dim = self._dim
+        if minuend_dim is None:
+            raise ValueError("Dimensions of objects to subtract from are inconsistent")
 
-        return new_shape
+        # Check that the operation is valid
+        subtrahend_dims = [s._dim for s in subtrahends]
+        if any(d < minuend_dim for d in subtrahend_dims):
+            raise ValueError(
+                f"Only shapes with equal or greater dimension can be subtracted: "
+                f"not {type(self).__name__} ({minuend_dim}D) and "
+                f"{type(other).__name__} ({min(subtrahend_dims)}D)"
+            )
+
+        # Do the actual cut operation
+        difference = self.cut(*subtrahends)
+
+        # Simplify Compounds if possible
+        difference = (
+            difference.unwrap(fully=True)
+            if isinstance(difference, Compound)
+            else difference
+        )
+        # To allow the @, % and ^ operators to work 1D objects must be type Curve
+        if minuend_dim == 1:
+            difference = Curve(Compound(difference.edges()).wrapped)
+
+        return difference
 
     def __and__(self, other: Shape) -> Self:
         """intersect shape with self operator &"""
@@ -1769,11 +1799,15 @@ class Shape(NodeMixin):
         if new_shape.wrapped is not None and SkipClean.clean:
             new_shape = new_shape.clean()
 
-        if self._dim == 3:
-            new_shape = Part(new_shape.wrapped)
-        elif self._dim == 2:
-            new_shape = Sketch(new_shape.wrapped)
-        elif self._dim == 1:
+        # Simplify Compounds if possible
+        new_shape = (
+            new_shape.unwrap(fully=True)
+            if isinstance(new_shape, Compound)
+            else new_shape
+        )
+
+        # To allow the @, % and ^ operators to work 1D objects must be type Curve
+        if self._dim == 1:
             new_shape = Curve(Compound(new_shape.edges()).wrapped)
 
         return new_shape
@@ -3940,6 +3974,12 @@ class Compound(Mixin3D, Shape):
 
     _dim = None
 
+    @property
+    def _dim(self) -> Union[int, None]:
+        """The dimension of the shapes within the Compound - None if inconsistent"""
+        sub_dims = {s._dim for s in self.first_level_shapes()}
+        return sub_dims.pop() if len(sub_dims) == 1 else None
+
     @overload
     def __init__(
         self,
@@ -4524,6 +4564,8 @@ class Compound(Mixin3D, Shape):
         Returns:
             ShapeList[Shape]: Shapes contained within the Compound
         """
+        if self.wrapped is None:
+            return ShapeList()
         if _shapes is None:
             _shapes = []
         iterator = TopoDS_Iterator()
@@ -4575,17 +4617,29 @@ class Part(Compound):
 
     _dim = 3
 
+    @property
+    def _dim(self) -> int:
+        return 3
+
 
 class Sketch(Compound):
     """A Compound containing 2D objects - aka Faces"""
 
     _dim = 2
 
+    @property
+    def _dim(self) -> int:
+        return 2
+
 
 class Curve(Compound):
     """A Compound containing 1D objects - aka Edges"""
 
     _dim = 1
+
+    @property
+    def _dim(self) -> int:
+        return 1
 
     def __matmul__(self, position: float) -> Vector:
         """Position on curve operator @ - only works if continuous"""
@@ -4616,6 +4670,10 @@ class Edge(Mixin1D, Shape):
     # pylint: disable=too-many-public-methods
 
     _dim = 1
+
+    @property
+    def _dim(self) -> int:
+        return 1
 
     @overload
     def __init__(
@@ -5543,6 +5601,10 @@ class Face(Shape):
     # pylint: disable=too-many-public-methods
 
     _dim = 2
+
+    @property
+    def _dim(self) -> int:
+        return 2
 
     @overload
     def __init__(
@@ -6743,6 +6805,10 @@ class Shell(Shape):
 
     _dim = 2
 
+    @property
+    def _dim(self) -> int:
+        return 2
+
     @overload
     def __init__(
         self,
@@ -6921,6 +6987,10 @@ class Solid(Mixin3D, Shape):
     Solid objects to create or modify complex geometries."""
 
     _dim = 3
+
+    @property
+    def _dim(self) -> int:
+        return 3
 
     @overload
     def __init__(
@@ -7713,6 +7783,10 @@ class Vertex(Shape):
 
     _dim = 0
 
+    @property
+    def _dim(self) -> int:
+        return 0
+
     @overload
     def __init__(self):  # pragma: no cover
         """Default Vertext at the origin"""
@@ -7893,6 +7967,10 @@ class Wire(Mixin1D, Shape):
     allowing precise definition of paths within a 3D model."""
 
     _dim = 1
+
+    @property
+    def _dim(self) -> int:
+        return 1
 
     @overload
     def __init__(
