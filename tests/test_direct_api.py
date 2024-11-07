@@ -2567,35 +2567,29 @@ class TestPlane(DirectApiTestCase):
             ]
         )
 
-        def face_props(f: Face) -> GProp_GProps:
-            assert f.wrapped is not None
-            f_props = GProp_GProps()
-            BRepGProp.SurfaceProperties_s(f.wrapped, f_props)
-            return f_props
-
         expected = [
             # Trapezoid face, negative y coordinate
             (
-                lambda f: face_props(f).CentreOfMass(),  # plane origin
-                lambda f: Axis.X.direction,  # plane x_dir
-                lambda f: Axis.Z.direction,  # plane y_dir
-                lambda f: -Axis.Y.direction,  # plane z_dir
+                Axis.X.direction,  # plane x_dir
+                Axis.Z.direction,  # plane y_dir
+                 -Axis.Y.direction,  # plane z_dir
             ),
             # Trapezoid face, positive y coordinate
             (
-                lambda f: face_props(f).CentreOfMass(),
-                lambda f: -Axis.X.direction,
-                lambda f: Axis.Z.direction,
-                lambda f: Axis.Y.direction,
+                -Axis.X.direction,
+                Axis.Z.direction,
+                Axis.Y.direction,
             ),
         ]
         # assert properties of the trapezoid faces
         for i, f in enumerate(lofted_solid.faces() | Plane.XZ > Axis.Y):
             p = Plane(f)
-            self.assertVectorAlmostEquals(p.origin, expected[i][0](f), 6)
-            self.assertVectorAlmostEquals(p.x_dir, expected[i][1](f), 6)
-            self.assertVectorAlmostEquals(p.y_dir, expected[i][2](f), 6)
-            self.assertVectorAlmostEquals(p.z_dir, expected[i][3](f), 6)
+            f_props = GProp_GProps()
+            BRepGProp.SurfaceProperties_s(f.wrapped, f_props)
+            self.assertVectorAlmostEquals(p.origin, f_props.CentreOfMass(), 6)
+            self.assertVectorAlmostEquals(p.x_dir, expected[i][0], 6)
+            self.assertVectorAlmostEquals(p.y_dir, expected[i][1], 6)
+            self.assertVectorAlmostEquals(p.z_dir, expected[i][2], 6)
 
     def test_plane_neg(self):
         p = Plane(
