@@ -27,7 +27,7 @@ license:
 """
 
 import unittest
-from math import pi, sqrt
+from math import pi, sqrt, atan2, degrees
 from build123d import *
 
 
@@ -395,8 +395,21 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertAlmostEqual(test.sketch.area, 8 * (12 + 4) / 2, 5)
 
     def test_triangle(self):
-        tri = Triangle(a=3, b=4, c=5)
+        tri = Triangle(a=3, b=4, c=5, align=Align.MIN)
         self.assertAlmostEqual(tri.area, (3 * 4) / 2, 5)
+        self.assertAlmostEqual(tri.A, degrees(atan2(3, 4)), 5)
+        self.assertAlmostEqual(tri.B, degrees(atan2(4, 3)), 5)
+        self.assertAlmostEqual(tri.C, 90, 5)
+        self.assertAlmostEqual(tri.a, 3, 5)
+        self.assertAlmostEqual(tri.b, 4, 5)
+        self.assertAlmostEqual(tri.c, 5, 5)
+        self.assertAlmostEqual(tri.edge_a.length, 3, 5)
+        self.assertAlmostEqual(tri.edge_b.length, 4, 5)
+        self.assertAlmostEqual(tri.edge_c.length, 5, 5)
+        self.assertTupleAlmostEquals(tri.vertex_A, (3, 4, 0), 5)
+        self.assertTupleAlmostEquals(tri.vertex_B, (0, 0, 0), 5)
+        self.assertTupleAlmostEquals(tri.vertex_C, (3, 0, 0), 5)
+
         tri = Triangle(c=5, C=90, a=3)
         self.assertAlmostEqual(tri.area, (3 * 4) / 2, 5)
 

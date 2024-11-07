@@ -37,7 +37,17 @@ from build123d.build_common import LocationList, flatten_sequence, validate_inpu
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
-from build123d.topology import Compound, Edge, Face, ShapeList, Sketch, Wire, tuplify
+from build123d.topology import (
+    Compound,
+    Edge,
+    Face,
+    ShapeList,
+    Sketch,
+    Wire,
+    tuplify,
+    TOLERANCE,
+    topo_explore_common_vertex,
+)
 
 
 class BaseSketchObject(Sketch):
@@ -720,3 +730,25 @@ class Triangle(BaseSketchObject):
         triangle.move(Location(-center_of_geometry))
         alignment = None if align is None else tuplify(align, 2)
         super().__init__(obj=triangle, rotation=rotation, align=alignment, mode=mode)
+        self.edge_a = self.edges().filter_by(lambda e: abs(e.length - a) < TOLERANCE)[
+            0
+        ]  #: edge 'a'
+        self.edge_b = self.edges().filter_by(
+            lambda e: abs(e.length - b) < TOLERANCE and e not in [self.edge_a]
+        )[
+            0
+        ]  #: edge 'b'
+        self.edge_c = self.edges().filter_by(
+            lambda e: e not in [self.edge_a, self.edge_b]
+        )[
+            0
+        ]  #: edge 'c'
+        self.vertex_A = topo_explore_common_vertex(
+            self.edge_b, self.edge_c
+        )  #: vertex 'A'
+        self.vertex_B = topo_explore_common_vertex(
+            self.edge_a, self.edge_c
+        )  #: vertex 'B'
+        self.vertex_C = topo_explore_common_vertex(
+            self.edge_a, self.edge_b
+        )  #: vertex 'C'
