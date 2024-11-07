@@ -110,6 +110,10 @@ def add(
         raise RuntimeError("Add must have an active builder context")
 
     object_iter = objects if isinstance(objects, Iterable) else [objects]
+    object_iter = [
+        obj.unwrap(fully=False) if isinstance(obj, Compound) else obj
+        for obj in object_iter
+    ]
     object_iter = [obj._obj if isinstance(obj, Builder) else obj for obj in object_iter]
 
     validate_inputs(context, "add", object_iter)
