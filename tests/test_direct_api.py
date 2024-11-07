@@ -14,6 +14,7 @@ from random import uniform
 from IPython.lib import pretty
 
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+from OCP.BRepGProp import BRepGProp
 from OCP.gp import (
     gp,
     gp_Ax1,
@@ -28,6 +29,7 @@ from OCP.gp import (
     gp_Vec,
     gp_XYZ,
 )
+from OCP.GProp import GProp_GProps
 
 from build123d.build_common import GridLocations, Locations, PolarLocations
 from build123d.build_enums import (
@@ -2556,16 +2558,44 @@ class TestPlane(DirectApiTestCase):
         with self.assertRaises(TypeError):
             Plane(Edge.make_line((0, 0), (0, 1)))
 
-        # can be instantiated from planar faces of different surface types
-        # this loft creates new faces of types Geom_Plane and Geom_BSplineSurface
+        # can be instantiated from planar faces of surface types other than Geom_Plane
+        # this loft creates the trapezoid faces of type Geom_BSplineSurface
         lofted_solid = Solid.make_loft(
             [
                 Rectangle(3, 1).wire(),
                 Pos(0, 0, 1) * Rectangle(1, 1).wire(),
             ]
         )
-        for f in lofted_solid.faces():
-            Plane(f)
+
+        def face_props(f: Face) -> GProp_GProps:
+            assert f.wrapped is not None
+            f_props = GProp_GProps()
+            BRepGProp.SurfaceProperties_s(f.wrapped, f_props)
+            return f_props
+
+        expected = [
+            # Trapezoid face, negative y coordinate
+            (
+                lambda f: face_props(f).CentreOfMass(),  # plane origin
+                lambda f: Axis.X.direction,  # plane x_dir
+                lambda f: Axis.Z.direction,  # plane y_dir
+                lambda f: -Axis.Y.direction,  # plane z_dir
+            ),
+            # Trapezoid face, positive y coordinate
+            (
+                lambda f: face_props(f).CentreOfMass(),
+                lambda f: -Axis.X.direction,
+                lambda f: Axis.Z.direction,
+                lambda f: Axis.Y.direction,
+            ),
+        ]
+        # assert properties of the trapezoid faces
+        for i, f in enumerate(lofted_solid.faces() | Plane.XZ > Axis.Y):
+            p = Plane(f)
+            self.assertVectorAlmostEquals(p.origin, expected[i][0](f), 6)
+            self.assertVectorAlmostEquals(p.x_dir, expected[i][1](f), 6)
+            self.assertVectorAlmostEquals(p.y_dir, expected[i][2](f), 6)
+            self.assertVectorAlmostEquals(p.z_dir, expected[i][3](f), 6)
 
     def test_plane_neg(self):
         p = Plane(
