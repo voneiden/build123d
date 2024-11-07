@@ -366,6 +366,7 @@ geom_LUT_EDGE: Dict[ga.GeomAbs_CurveType, GeomType] = {
 
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 
+TrimmingTool = Union[Plane,"Shell", "Face"]
 
 def tuplify(obj: Any, dim: int) -> tuple:
     """Create a size tuple"""
@@ -2765,7 +2766,7 @@ class Shape(NodeMixin):
 
         return ShapeList([Face(face) for face in faces])
 
-    def split(self, surface: Union[Plane, Face], keep: Keep = Keep.TOP) -> Self:
+    def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP) -> Self:
         """split
 
         Split this shape by the provided plane or face.
@@ -2781,13 +2782,9 @@ class Shape(NodeMixin):
         shape_list.Append(self.wrapped)
 
         # Define the splitting tool
-        tool = (
-            Face.make_plane(surface).wrapped
-            if isinstance(surface, Plane)
-            else surface.wrapped
-        )
+        trim_tool = Face.make_plane(tool).wrapped if isinstance(tool, Plane) else tool.wrapped
         tool_list = TopTools_ListOfShape()
-        tool_list.Append(tool)
+        tool_list.Append(trim_tool)
 
         # Create the splitter algorithm
         splitter = BRepAlgoAPI_Splitter()
@@ -2801,13 +2798,13 @@ class Shape(NodeMixin):
 
         result = Compound(downcast(splitter.Shape())).unwrap(fully=False)
         if keep != Keep.BOTH:
-            if not isinstance(surface, Plane):
+            if not isinstance(tool, Plane):
                 # Create solids from the surfaces for sorting
-                surface_up = surface.thicken(0.1)
+                surface_up = tool.thicken(0.1)
             tops, bottoms = [], []
             for part in result:
-                if isinstance(surface, Plane):
-                    is_up = surface.to_local_coords(part).center().Z >= 0
+                if isinstance(tool, Plane):
+                    is_up = tool.to_local_coords(part).center().Z >= 0
                 else:
                     is_up = surface_up.intersect(part).volume >= TOLERANCE
                 (tops if is_up else bottoms).append(part)
@@ -6484,7 +6481,7 @@ class Face(Shape):
             and 1 - abs(plane.z_dir.dot(Vector(normal))) < TOLERANCE
         )
 
-    def thicken(self, depth: float, normal_override: VectorLike = None) -> Solid:
+    def thicken(self, depth: float, normal_override: Optional[VectorLike] = None) -> Solid:
         """Thicken Face
 
         Create a solid from a potentially non planar face by thickening along the normals.
@@ -6514,27 +6511,7 @@ class Face(Shape):
             if face_normal.dot(Vector(normal_override).normalized()) < 0:
                 adjusted_depth = -depth
 
-        solid = BRepOffset_MakeOffset()
-        solid.Initialize(
-            self.wrapped,
-            Offset=adjusted_depth,
-            Tol=1.0e-5,
-            Mode=BRepOffset_Skin,
-            # BRepOffset_RectoVerso - which describes the offset of a given surface shell along both
-            # sides of the surface but doesn't seem to work
-            Intersection=True,
-            SelfInter=False,
-            Join=GeomAbs_Intersection,  # Could be GeomAbs_Arc,GeomAbs_Tangent,GeomAbs_Intersection
-            Thickening=True,
-            RemoveIntEdges=True,
-        )
-        solid.MakeOffsetShape()
-        try:
-            result = Solid(solid.Shape())
-        except StdFail_NotDone as err:
-            raise RuntimeError("Error applying thicken to given Face") from err
-
-        return result.clean()
+        return _thicken(self.wrapped, adjusted_depth)
 
     def project_to_shape(
         self, target_object: Shape, direction: VectorLike, taper: float = 0
@@ -7000,6 +6977,25 @@ class Shell(Shape):
         """
         return cls(_make_loft(objs, False, ruled))
 
+    def thicken(self, depth: float) -> Solid:
+        """Thicken Shell
+
+        Create a solid from a shell by thickening along the normals.
+
+        Args:
+            depth (float): Amount to thicken face(s), can be positive or negative.
+            normal_override (Vector, optional): The normal_override vector can be used to
+                indicate which way is 'up', potentially flipping the face normal direction
+                such that many faces with different normals all go in the same direction
+                (direction need only be +/- 90 degrees from the face normal). Defaults to None.
+
+        Raises:
+            RuntimeError: Opencascade internal failures
+
+        Returns:
+            Solid: The resulting Solid object
+        """
+        return _thicken(self.wrapped, depth)
 
 class Solid(Mixin3D, Shape):
     """A Solid in build123d represents a three-dimensional solid geometry
@@ -8860,6 +8856,28 @@ class Joint(ABC):
         """A CAD object positioned in global space to illustrate the joint"""
         raise NotImplementedError
 
+def _thicken(obj: TopoDS_Shape, depth: float):
+    solid = BRepOffset_MakeOffset()
+    solid.Initialize(
+        obj,
+        Offset=depth,
+        Tol=1.0e-5,
+        Mode=BRepOffset_Skin,
+        # BRepOffset_RectoVerso - which describes the offset of a given surface shell along both
+        # sides of the surface but doesn't seem to work
+        Intersection=True,
+        SelfInter=False,
+        Join=GeomAbs_Intersection,  # Could be GeomAbs_Arc,GeomAbs_Tangent,GeomAbs_Intersection
+        Thickening=True,
+        RemoveIntEdges=True,
+    )
+    solid.MakeOffsetShape()
+    try:
+        result = Solid(solid.Shape())
+    except StdFail_NotDone as err:
+        raise RuntimeError("Error applying thicken to given Face") from err
+
+    return result.clean()
 
 def _make_loft(
     objs: Iterable[Union[Vertex, Wire]],
