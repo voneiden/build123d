@@ -62,7 +62,6 @@ from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.Geom import Geom_BoundedSurface, Geom_Line, Geom_Plane
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS, GeomAPI_IntSS
-from OCP.GeomLib import GeomLib_IsPlanarSurface
 from OCP.gp import (
     gp_Ax1,
     gp_Ax2,
@@ -2093,8 +2092,7 @@ class Plane(metaclass=PlaneMeta):
         elif arg_face:
             # Determine if face is planar
             surface = BRep_Tool.Surface_s(arg_face.wrapped)
-            is_surface_planar = GeomLib_IsPlanarSurface(surface, TOLERANCE).IsPlanar()
-            if not is_surface_planar:
+            if not arg_face.is_planar:
                 raise ValueError("Planes can only be created from planar faces")
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
