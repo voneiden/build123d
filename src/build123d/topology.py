@@ -1481,29 +1481,34 @@ class Shape(NodeMixin):
         """Set the shape's color"""
         self._color = value
 
-    def copy_attributes_to(self, target: Shape, attributes: list[str]):
-        """Copy object attributes to target
+    def copy_attributes_to(self, target: Shape, exceptions: Iterable[str] = None):
+        """Copy common object attributes to target
+
+        Note that preset attributes of target will not be overridden.
 
         Args:
             target (Shape): object to gain attributes
-            attributes (list[str]): attributes to copy
+            exceptions (Iterable[str], optional): attributes not to copy
 
         Raises:
             ValueError: invalid attribute
         """
-        for attr in attributes:
-            # Check if both 'self' and 'target' have the attribute
-            if hasattr(self, attr):
-                if hasattr(target, attr):
-                    # Copy the attribute only if the target's attribute not set
-                    if not getattr(target, attr):
-                        setattr(target, attr, getattr(self, attr))
-                elif getattr(self, attr):
-                    warnings.warn(
-                        f"Target does not have attribute '{attr}', skipping copy."
-                    )
-            else:
-                raise ValueError(f"Source does not have attribute '{attr}'")
+        # Find common attributes and eliminate exceptions
+        attrs1 = set(self.__dict__.keys())
+        attrs2 = set(target.__dict__.keys())
+        common_attrs = attrs1 & attrs2
+        if exceptions is not None:
+            common_attrs -= set(exceptions)
+
+        for attr in common_attrs:
+            # Copy the attribute only if the target's attribute not set
+            if not getattr(target, attr):
+                setattr(target, attr, getattr(self, attr))
+            # Attach joints to the new part
+            if attr == "joints":
+                joint: Joint
+                for joint in target.joints.values():
+                    joint.parent = target
 
     @property
     def is_manifold(self) -> bool:
@@ -2532,7 +2537,7 @@ class Shape(NodeMixin):
             trsf.SetDisplacement(new_ax, old_ax)
             builder = BRepBuilderAPI_Transform(self.wrapped, trsf, True, True)
 
-            self.wrapped = builder.Shape()
+            self.wrapped = downcast(builder.Shape())
             self.wrapped.Location(loc.wrapped)
 
     def distance_to_with_closest_points(
@@ -2594,7 +2599,12 @@ class Shape(NodeMixin):
         operation.SetRunParallel(True)
         operation.Build()
 
-        return Shape.cast(operation.Shape())
+        result = Shape.cast(operation.Shape())
+
+        base = args[0] if isinstance(args, tuple) else args
+        base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+
+        return result
 
     def cut(self, *to_cut: Shape) -> Self:
         """Remove the positional arguments from this Shape.
@@ -4591,6 +4601,7 @@ class Compound(Mixin3D, Shape):
         """
         if len(self) == 1:
             single_element = next(iter(self))
+            self.copy_attributes_to(single_element, ["wrapped", "_NodeMixin__children"])
 
             # If the single element is another Compound, unwrap it recursively
             if isinstance(single_element, Compound):
@@ -4598,12 +4609,7 @@ class Compound(Mixin3D, Shape):
                 unwrapped = single_element.unwrap(fully)
                 if not fully:
                     unwrapped = type(self)(unwrapped.wrapped)
-                attr_to_copy = [
-                    attr
-                    for attr in self.__dict__.keys()
-                    if attr not in ["wrapped", "_NodeMixin__children"]
-                ]
-                self.copy_attributes_to(unwrapped, attr_to_copy)
+                self.copy_attributes_to(unwrapped, ["wrapped", "_NodeMixin__children"])
                 return unwrapped
 
             return single_element if fully else self

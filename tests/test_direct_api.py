@@ -3328,25 +3328,15 @@ class TestShape(DirectApiTestCase):
         box2 = Box(10, 10, 10)
         box.label = "box"
         box.color = Color("Red")
-        box.joints = ["j1", "j2"]
         box.children = [Box(1, 1, 1), Box(2, 2, 2)]
         box.topo_parent = box2
 
         blank = Compound()
-        box.copy_attributes_to(
-            blank, ["color", "label", "joints", "children", "topo_parent"]
-        )
+        box.copy_attributes_to(blank)
         self.assertEqual(blank.label, "box")
         self.assertTrue(all(c1 == c2 for c1, c2 in zip(blank.color, Color("Red"))))
-        self.assertTrue(all(j1 == j2 for j1, j2 in zip(blank.joints, ["j1", "j2"])))
         self.assertTrue(all(c1 == c2 for c1, c2 in zip(blank.children, box.children)))
         self.assertEqual(blank.topo_parent, box2)
-
-        with self.assertRaises(ValueError):
-            box.copy_attributes_to(blank, ["invalid"])
-
-        with self.assertWarns(UserWarning):
-            box.copy_attributes_to(Edge.make_line((0, 0), (1, 1)), ["joints"])
 
 
 class TestShapeList(DirectApiTestCase):

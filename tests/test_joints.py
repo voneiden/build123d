@@ -31,7 +31,9 @@ import copy
 import unittest
 
 from build123d.build_enums import Align, CenterOf, GeomType
+from build123d.build_common import Mode
 from build123d.build_part import BuildPart
+from build123d.build_sketch import BuildSketch
 from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
 from build123d.joints import (
     BallJoint,
@@ -41,6 +43,8 @@ from build123d.joints import (
     RigidJoint,
 )
 from build123d.objects_part import Box, Cone, Cylinder, Sphere
+from build123d.objects_sketch import Circle
+from build123d.operations_part import extrude
 from build123d.topology import Edge, Plane, Solid
 
 
@@ -529,6 +533,27 @@ class TestJointCopy(DirectApiTestCase):
 
         test_copy = copy.deepcopy(test.part, None)
         self.assertEqual(test_copy.joints["test"].parent, test_copy)
+
+
+class TestJointPropagation(DirectApiTestCase):
+    def test_algebra_mode(self):
+        b = Box(2, 2, 2)
+        RigidJoint("top", b, b.faces().sort_by(Axis.Z)[-1].location_at(0.5, 0.5))
+        c = b - Cylinder(0.5, 2)
+        self.assertVectorAlmostEquals(c.joints["top"].location.position, (0, 0, 1), 5)
+
+    def test_builder_mode(self):
+        with BuildPart() as base_builder:
+            Box(6, 6, 6)
+            top_face = base_builder.faces().sort_by(Axis.Z)[-1]
+            RigidJoint("top", joint_location=top_face.location_at(0.5, 0.5))
+            with BuildSketch(base_builder.faces()):
+                Circle(2)
+            extrude(amount=-1, mode=Mode.SUBTRACT)
+        base = base_builder.part
+        self.assertVectorAlmostEquals(
+            base.joints["top"].location.position, (0, 0, 3), 5
+        )
 
 
 if __name__ == "__main__":
