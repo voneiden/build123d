@@ -60,7 +60,7 @@ from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
-from OCP.Geom import Geom_Line, Geom_Plane
+from OCP.Geom import Geom_BoundedSurface, Geom_Line, Geom_Plane
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS, GeomAPI_IntSS
 from OCP.gp import (
     gp_Ax1,
@@ -2092,18 +2092,19 @@ class Plane(metaclass=PlaneMeta):
         elif arg_face:
             # Determine if face is planar
             surface = BRep_Tool.Surface_s(arg_face.wrapped)
-            if not isinstance(surface, Geom_Plane):
+            if not arg_face.is_planar:
                 raise ValueError("Planes can only be created from planar faces")
             properties = GProp_GProps()
             BRepGProp.SurfaceProperties_s(arg_face.wrapped, properties)
             self._origin = Vector(properties.CentreOfMass())
-            self.x_dir = (
-                Vector(arg_x_dir)
-                if arg_x_dir
-                else Vector(
-                    BRep_Tool.Surface_s(arg_face.wrapped).Position().XDirection()
-                )
-            )
+            if isinstance(surface, Geom_BoundedSurface):
+                point = gp_Pnt()
+                face_x_dir = gp_Vec()
+                tangent_v = gp_Vec()
+                surface.D1(0.5, 0.5, point, face_x_dir, tangent_v)
+            else:
+                face_x_dir = surface.Position().XDirection()
+            self.x_dir = Vector(arg_x_dir) if arg_x_dir else Vector(face_x_dir)
             self.x_dir = Vector(round(i, 14) for i in self.x_dir)
             self.z_dir = Plane.get_topods_face_normal(arg_face.wrapped)
             self.z_dir = Vector(round(i, 14) for i in self.z_dir)

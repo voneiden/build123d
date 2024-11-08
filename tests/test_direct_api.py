@@ -14,6 +14,7 @@ from random import uniform
 from IPython.lib import pretty
 
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
+from OCP.BRepGProp import BRepGProp
 from OCP.gp import (
     gp,
     gp_Ax1,
@@ -28,6 +29,7 @@ from OCP.gp import (
     gp_Vec,
     gp_XYZ,
 )
+from OCP.GProp import GProp_GProps
 
 from build123d.build_common import GridLocations, Locations, PolarLocations
 from build123d.build_enums import (
@@ -2562,6 +2564,39 @@ class TestPlane(DirectApiTestCase):
 
         with self.assertRaises(TypeError):
             Plane(Edge.make_line((0, 0), (0, 1)))
+
+        # can be instantiated from planar faces of surface types other than Geom_Plane
+        # this loft creates the trapezoid faces of type Geom_BSplineSurface
+        lofted_solid = Solid.make_loft(
+            [
+                Rectangle(3, 1).wire(),
+                Pos(0, 0, 1) * Rectangle(1, 1).wire(),
+            ]
+        )
+
+        expected = [
+            # Trapezoid face, negative y coordinate
+            (
+                Axis.X.direction,  # plane x_dir
+                Axis.Z.direction,  # plane y_dir
+                 -Axis.Y.direction,  # plane z_dir
+            ),
+            # Trapezoid face, positive y coordinate
+            (
+                -Axis.X.direction,
+                Axis.Z.direction,
+                Axis.Y.direction,
+            ),
+        ]
+        # assert properties of the trapezoid faces
+        for i, f in enumerate(lofted_solid.faces() | Plane.XZ > Axis.Y):
+            p = Plane(f)
+            f_props = GProp_GProps()
+            BRepGProp.SurfaceProperties_s(f.wrapped, f_props)
+            self.assertVectorAlmostEquals(p.origin, f_props.CentreOfMass(), 6)
+            self.assertVectorAlmostEquals(p.x_dir, expected[i][0], 6)
+            self.assertVectorAlmostEquals(p.y_dir, expected[i][1], 6)
+            self.assertVectorAlmostEquals(p.z_dir, expected[i][2], 6)
 
     def test_plane_neg(self):
         p = Plane(
