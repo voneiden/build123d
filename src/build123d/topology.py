@@ -366,7 +366,8 @@ geom_LUT_EDGE: Dict[ga.GeomAbs_CurveType, GeomType] = {
 
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 
-TrimmingTool = Union[Plane,"Shell", "Face"]
+TrimmingTool = Union[Plane, "Shell", "Face"]
+
 
 def tuplify(obj: Any, dim: int) -> tuple:
     """Create a size tuple"""
@@ -2782,7 +2783,9 @@ class Shape(NodeMixin):
         shape_list.Append(self.wrapped)
 
         # Define the splitting tool
-        trim_tool = Face.make_plane(tool).wrapped if isinstance(tool, Plane) else tool.wrapped
+        trim_tool = (
+            Face.make_plane(tool).wrapped if isinstance(tool, Plane) else tool.wrapped
+        )
         tool_list = TopTools_ListOfShape()
         tool_list.Append(trim_tool)
 
@@ -6481,7 +6484,9 @@ class Face(Shape):
             and 1 - abs(plane.z_dir.dot(Vector(normal))) < TOLERANCE
         )
 
-    def thicken(self, depth: float, normal_override: Optional[VectorLike] = None) -> Solid:
+    def thicken(
+        self, depth: float, normal_override: Optional[VectorLike] = None
+    ) -> Solid:
         """Thicken Face
 
         Create a solid from a potentially non planar face by thickening along the normals.
@@ -6996,6 +7001,7 @@ class Shell(Shape):
             Solid: The resulting Solid object
         """
         return _thicken(self.wrapped, depth)
+
 
 class Solid(Mixin3D, Shape):
     """A Solid in build123d represents a three-dimensional solid geometry
@@ -8856,6 +8862,7 @@ class Joint(ABC):
         """A CAD object positioned in global space to illustrate the joint"""
         raise NotImplementedError
 
+
 def _thicken(obj: TopoDS_Shape, depth: float):
     solid = BRepOffset_MakeOffset()
     solid.Initialize(
@@ -8878,6 +8885,7 @@ def _thicken(obj: TopoDS_Shape, depth: float):
         raise RuntimeError("Error applying thicken to given Face") from err
 
     return result.clean()
+
 
 def _make_loft(
     objs: Iterable[Union[Vertex, Wire]],
