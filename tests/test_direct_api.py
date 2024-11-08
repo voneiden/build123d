@@ -3004,7 +3004,7 @@ class TestShape(DirectApiTestCase):
         self.assertLess(s2.volume, s.volume)
         self.assertGreater(s2.volume, 0.0)
 
-    def test_split_by_non_plarnar_face(self):
+    def test_split_by_non_planar_face(self):
         box = Solid.make_box(1, 1, 1)
         tool = Circle(1).wire()
         tool_shell: Shell = Shape.extrude(tool, Vector(0, 0, 1))
