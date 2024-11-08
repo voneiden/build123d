@@ -3687,7 +3687,7 @@ class TestShells(DirectApiTestCase):
         self.assertEqual(len(sweep_w_w.faces()), 4)
         self.assertEqual(len(sweep_c2_c2.faces()), 4)
 
-    def test_loft(self):
+    def test_make_loft(self):
         r = 3
         h = 2
         loft = Shell.make_loft(
@@ -3696,7 +3696,6 @@ class TestShells(DirectApiTestCase):
         self.assertEqual(loft.volume, 0, "A shell has no volume")
         cylinder_area = 2 * math.pi * r * h
         self.assertAlmostEqual(loft.area, cylinder_area)
-
 
 class TestSolid(DirectApiTestCase):
     def test_make_solid(self):
@@ -3836,6 +3835,9 @@ class TestSolid(DirectApiTestCase):
 
         with self.assertRaises(ValueError):
             Solid.make_loft([Vertex(0, 0, 1), Vertex(0, 0, 2)])
+
+        with self.assertRaises(ValueError):
+            Solid.make_loft([Vertex(0, 0, 1),Wire.make_rect(1, 1), Vertex(0, 0, 2), Vertex(0, 0, 3)])
 
     def test_extrude_until(self):
         square = Face.make_rect(1, 1)
