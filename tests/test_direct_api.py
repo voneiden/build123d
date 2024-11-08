@@ -3015,12 +3015,12 @@ class TestShape(DirectApiTestCase):
 
     def test_split_by_shell(self):
         box = Solid.make_box(5, 5, 1)
-        tool = Wire.make_rect(4,4)
+        tool = Wire.make_rect(4, 4)
         tool_shell: Shell = Shape.extrude(tool, Vector(0, 0, 1))
         split = box.split(tool_shell, keep=Keep.TOP)
-        inner_vol  = 2*2
-        outer_vol = 5*5
-        self.assertAlmostEqual(split.volume , outer_vol-inner_vol)
+        inner_vol = 2 * 2
+        outer_vol = 5 * 5
+        self.assertAlmostEqual(split.volume, outer_vol - inner_vol)
 
     def test_split_by_perimeter(self):
         # Test 0 - extract a spherical cap
@@ -3866,7 +3866,14 @@ class TestSolid(DirectApiTestCase):
             Solid.make_loft([Vertex(0, 0, 1), Vertex(0, 0, 2)])
 
         with self.assertRaises(ValueError):
-            Solid.make_loft([Vertex(0, 0, 1),Wire.make_rect(1, 1), Vertex(0, 0, 2), Vertex(0, 0, 3)])
+            Solid.make_loft(
+                [
+                    Vertex(0, 0, 1),
+                    Wire.make_rect(1, 1),
+                    Vertex(0, 0, 2),
+                    Vertex(0, 0, 3),
+                ]
+            )
 
     def test_extrude_until(self):
         square = Face.make_rect(1, 1)
