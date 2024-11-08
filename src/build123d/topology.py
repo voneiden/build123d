@@ -6983,6 +6983,29 @@ class Shell(Shape):
         builder.Build()
         return Shape.cast(builder.Shape())
 
+    @classmethod
+    def make_loft(
+        cls, objs: Iterable[Union[Vertex, Wire]], ruled: bool = False
+    ) -> Shell:
+        """make loft
+
+        Makes a loft from a list of wires and vertices.
+        Vertices can appear only at the beginning or end of the list, but cannot appear consecutively within the list
+        nor between wires.
+        Wires may be closed or opened.
+
+        Args:
+            objs (list[Vertex, Wire]): wire perimeters or vertices
+            ruled (bool, optional): stepped or smooth. Defaults to False (smooth).
+
+        Raises:
+            ValueError: Too few wires
+
+        Returns:
+            Shell: Lofted object
+        """
+        return cls(_make_loft(objs, False, ruled))
+
 
 class Solid(Mixin3D, Shape):
     """A Solid in build123d represents a three-dimensional solid geometry
@@ -7246,8 +7269,9 @@ class Solid(Mixin3D, Shape):
     ) -> Solid:
         """make loft
 
-        Makes a loft from a list of wires and vertices, where vertices can be the first,
-        last, or first and last elements.
+        Makes a loft from a list of wires and vertices.
+        Vertices can appear only at the beginning or end of the list, but cannot appear consecutively within the list
+        nor between wires.
 
         Args:
             objs (list[Vertex, Wire]): wire perimeters or vertices
@@ -7259,22 +7283,7 @@ class Solid(Mixin3D, Shape):
         Returns:
             Solid: Lofted object
         """
-
-        if len(objs) < 2:
-            raise ValueError("More than one wire, or a wire and a vertex is required")
-
-        # the True flag requests building a solid instead of a shell.
-        loft_builder = BRepOffsetAPI_ThruSections(True, ruled)
-
-        for obj in objs:
-            if isinstance(obj, Vertex):
-                loft_builder.AddVertex(obj.wrapped)
-            elif isinstance(obj, Wire):
-                loft_builder.AddWire(obj.wrapped)
-
-        loft_builder.Build()
-
-        return cls(loft_builder.Shape())
+        return cls(_make_loft(objs, True, ruled))
 
     @classmethod
     def make_wedge(
@@ -8856,6 +8865,65 @@ class Joint(ABC):
     def symbol(self) -> Compound:  # pragma: no cover
         """A CAD object positioned in global space to illustrate the joint"""
         raise NotImplementedError
+
+
+def _make_loft(
+    objs: Iterable[Union[Vertex, Wire]],
+    filled: bool,
+    ruled: bool = False,
+) -> TopoDS_Shape:
+    """make loft
+
+    Makes a loft from a list of wires and vertices.
+    Vertices can appear only at the beginning or end of the list, but cannot appear consecutively within the list
+    nor between wires.
+
+    Args:
+        wires (list[Wire]): section perimeters
+        ruled (bool, optional): stepped or smooth. Defaults to False (smooth).
+
+    Raises:
+        ValueError: Too few wires
+
+    Returns:
+        TopoDS_Shape: Lofted object
+    """
+    if len(objs) < 2:
+        raise ValueError("More than one wire is required")
+    vertices = [obj for obj in objs if isinstance(obj, Vertex)]
+    vertex_count = len(vertices)
+
+    if vertex_count > 2:
+        raise ValueError("Only two vertices are allowed")
+
+    if vertex_count == 1 and not (
+        isinstance(objs[0], Vertex) or isinstance(objs[-1], Vertex)
+    ):
+        raise ValueError(
+            "The vertex must be either at the beginning or end of the list"
+        )
+
+    if vertex_count == 2:
+        if len(objs) == 2:
+            raise ValueError(
+                "You can't have only 2 vertices to loft; try adding some wires"
+            )
+        if not (isinstance(objs[0], Vertex) and isinstance(objs[-1], Vertex)):
+            raise ValueError(
+                "The vertices must be at the beginning and end of the list"
+            )
+
+    loft_builder = BRepOffsetAPI_ThruSections(filled, ruled)
+
+    for obj in objs:
+        if isinstance(obj, Vertex):
+            loft_builder.AddVertex(obj.wrapped)
+        elif isinstance(obj, Wire):
+            loft_builder.AddWire(obj.wrapped)
+
+    loft_builder.Build()
+
+    return loft_builder.Shape()
 
 
 def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
