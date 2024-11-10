@@ -6989,10 +6989,6 @@ class Shell(Shape):
 
         Args:
             depth (float): Amount to thicken face(s), can be positive or negative.
-            normal_override (Vector, optional): The normal_override vector can be used to
-                indicate which way is 'up', potentially flipping the face normal direction
-                such that many faces with different normals all go in the same direction
-                (direction need only be +/- 90 degrees from the face normal). Defaults to None.
 
         Raises:
             RuntimeError: Opencascade internal failures
