@@ -3039,6 +3039,24 @@ class TestShape(DirectApiTestCase):
         self.assertLess(s2.volume, s.volume)
         self.assertGreater(s2.volume, 0.0)
 
+    def test_split_by_non_planar_face(self):
+        box = Solid.make_box(1, 1, 1)
+        tool = Circle(1).wire()
+        tool_shell: Shell = Shape.extrude(tool, Vector(0, 0, 1))
+        split = box.split(tool_shell, keep=Keep.BOTH)
+
+        self.assertEqual(len(split.solids()), 2)
+        self.assertGreater(split.solids()[0].volume, split.solids()[1].volume)
+
+    def test_split_by_shell(self):
+        box = Solid.make_box(5, 5, 1)
+        tool = Wire.make_rect(4, 4)
+        tool_shell: Shell = Shape.extrude(tool, Vector(0, 0, 1))
+        split = box.split(tool_shell, keep=Keep.TOP)
+        inner_vol = 2 * 2
+        outer_vol = 5 * 5
+        self.assertAlmostEqual(split.volume, outer_vol - inner_vol)
+
     def test_split_by_perimeter(self):
         # Test 0 - extract a spherical cap
         target0 = Solid.make_sphere(10).rotate(Axis.Z, 90)
@@ -3722,6 +3740,17 @@ class TestShells(DirectApiTestCase):
         cylinder_area = 2 * math.pi * r * h
         self.assertAlmostEqual(loft.area, cylinder_area)
 
+    def test_thicken(self):
+        rect = Wire.make_rect(10, 5)
+        shell: Shell = Shape.extrude(rect, Vector(0, 0, 3))
+        thick = shell.thicken(1)
+
+        self.assertEqual(isinstance(thick, Solid), True)
+        inner_vol = 3 * 10 * 5
+        outer_vol = 3 * 12 * 7
+        self.assertAlmostEqual(thick.volume, outer_vol - inner_vol)
+
+
 class TestSolid(DirectApiTestCase):
     def test_make_solid(self):
         box_faces = Solid.make_box(1, 1, 1).faces()
@@ -3862,7 +3891,14 @@ class TestSolid(DirectApiTestCase):
             Solid.make_loft([Vertex(0, 0, 1), Vertex(0, 0, 2)])
 
         with self.assertRaises(ValueError):
-            Solid.make_loft([Vertex(0, 0, 1),Wire.make_rect(1, 1), Vertex(0, 0, 2), Vertex(0, 0, 3)])
+            Solid.make_loft(
+                [
+                    Vertex(0, 0, 1),
+                    Wire.make_rect(1, 1),
+                    Vertex(0, 0, 2),
+                    Vertex(0, 0, 3),
+                ]
+            )
 
     def test_extrude_until(self):
         square = Face.make_rect(1, 1)
