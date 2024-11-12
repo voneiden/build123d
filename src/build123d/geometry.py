@@ -1019,19 +1019,9 @@ class BoundBox:
             and second_box.max.Z < self.max.Z
         )
 
-    def to_align_offset(self, align: Tuple[Align, Align]) -> List[float]:
+    def to_align_offset(self, align: Sequence[Align]) -> Vector:
         """Amount to move object to achieve the desired alignment"""
-        align_offset = []
-        for i in range(2):
-            if align[i] == Align.MIN:
-                align_offset.append(-self.min.to_tuple()[i])
-            elif align[i] == Align.CENTER:
-                align_offset.append(
-                    -(self.min.to_tuple()[i] + self.max.to_tuple()[i]) / 2
-                )
-            elif align[i] == Align.MAX:
-                align_offset.append(-self.max.to_tuple()[i])
-        return align_offset
+        return to_align_offset(self.min.to_tuple(), self.max.to_tuple(), align)
 
 
 class Color:
@@ -2534,3 +2524,21 @@ class Plane(metaclass=PlaneMeta):
 
         elif shape is not None:
             return shape.intersect(self)
+
+
+def to_align_offset(
+    min_point: Sequence[float],
+    max_point: Sequence[float],
+    align: Sequence[Align],
+) -> Vector:
+    """Amount to move object to achieve the desired alignment"""
+    align_offset = []
+
+    for alignment, min_coord, max_coord in zip(align, min_point, max_point):
+        if alignment == Align.MIN:
+            align_offset.append(-min_coord)
+        elif alignment == Align.CENTER:
+            align_offset.append(-(min_coord + max_coord) / 2)
+        elif alignment == Align.MAX:
+            align_offset.append(-max_coord)
+    return Vector(*align_offset)

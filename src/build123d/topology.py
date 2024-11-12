@@ -4415,9 +4415,7 @@ class Compound(Mixin3D, Shape):
 
         # Align the text from the bounding box
         align = tuplify(align, 2)
-        text_flat = text_flat.translate(
-            Vector(*text_flat.bounding_box().to_align_offset(align))
-        )
+        text_flat = text_flat.translate(text_flat.bounding_box().to_align_offset(align))
 
         if text_path is not None:
             path_length = text_path.length
