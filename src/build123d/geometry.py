@@ -1019,7 +1019,7 @@ class BoundBox:
             and second_box.max.Z < self.max.Z
         )
 
-    def to_align_offset(self, align: Tuple[float, float]) -> Tuple[float, float]:
+    def to_align_offset(self, align: Tuple[Align, Align]) -> List[float]:
         """Amount to move object to achieve the desired alignment"""
         align_offset = []
         for i in range(2):
