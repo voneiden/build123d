@@ -29,8 +29,6 @@ license:
 import unittest
 from math import atan2, degrees, pi, sqrt
 
-import pytest
-
 from build123d import *
 
 
@@ -260,7 +258,7 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(r.radius, 2)
         self.assertEqual(r.side_count, 6)
         self.assertEqual(r.rotation, 0)
-        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
+        self.assertEqual(r.align, (Align.NONE, Align.NONE))
         self.assertEqual(r.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 2) * 2**2, 5)
         self.assertTupleAlmostEquals(
@@ -274,14 +272,13 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertAlmostEqual(r.radius, 1, 5)
         self.assertEqual(r.side_count, 3)
         self.assertEqual(r.rotation, 0)
-        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
+        self.assertEqual(r.align, (Align.NONE, Align.NONE))
         self.assertEqual(r.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 4) * (0.5 * 2) ** 2, 5)
         self.assertTupleAlmostEquals(
             test.sketch.faces()[0].normal_at().to_tuple(), (0, 0, 1), 5
         )
 
-    @pytest.mark.skip(reason="Conflicts with test_regular_polygon_matches_polar")
     def test_regular_polygon_align(self):
         with BuildSketch() as align:
             RegularPolygon(2, 5, align=(Align.MIN, Align.MAX))
@@ -297,7 +294,6 @@ class TestBuildSketchObjects(unittest.TestCase):
             Vector(align.vertices().sort_by_distance(other=(0, 0, 0))[-1]).length, 2
         )
 
-    @pytest.mark.skip(reason="Conflicts with test_regular_polygon_align")
     def test_regular_polygon_matches_polar(self):
         for side_count in range(3, 10):
             with BuildSketch():

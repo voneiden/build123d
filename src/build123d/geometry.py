@@ -2541,4 +2541,6 @@ def to_align_offset(
             align_offset.append(-(min_coord + max_coord) / 2)
         elif alignment == Align.MAX:
             align_offset.append(-max_coord)
+        elif alignment == Align.NONE:
+            align_offset.append(0)
     return Vector(*align_offset)

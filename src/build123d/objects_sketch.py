@@ -311,7 +311,7 @@ class RegularPolygon(BaseSketchObject):
         side_count: int,
         major_radius: bool = True,
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: tuple[Align, Align] = (Align.NONE, Align.NONE),
         mode: Mode = Mode.ADD,
     ):
         # pylint: disable=too-many-locals
