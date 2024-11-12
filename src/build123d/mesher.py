@@ -400,7 +400,10 @@ class Mesher:
 
             # Skip invalid meshes
             if len(ocp_mesh_vertices) < 3 or not triangles:
-                warnings.warn(f"Degenerate shape {b3d_shape} - skipped")
+                warnings.warn(
+                    f"Degenerate shape {b3d_shape} - skipped",
+                    stacklevel=2,
+                )
                 continue
 
             # Create 3mf mesh inputs
@@ -429,7 +432,7 @@ class Mesher:
             if not mesh_3mf.IsValid():
                 raise RuntimeError("3mf mesh is invalid")
             if not mesh_3mf.IsManifoldAndOriented():
-                warnings.warn("3mf mesh is not manifold")
+                warnings.warn("3mf mesh is not manifold", stacklevel=2)
 
             # Add mesh to model
             self.meshes.append(mesh_3mf)
