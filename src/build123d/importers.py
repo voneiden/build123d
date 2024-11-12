@@ -34,7 +34,6 @@ from math import degrees
 from pathlib import Path
 from typing import TextIO, Union, Optional
 
-import OCP.IFSelect
 from OCP.BRep import BRep_Builder
 from OCP.BRepGProp import BRepGProp
 from OCP.BRepTools import BRepTools
@@ -42,7 +41,6 @@ from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_ColorRGBA
 from OCP.RWStl import RWStl
 from OCP.STEPCAFControl import STEPCAFControl_Reader
-from OCP.STEPControl import STEPControl_Reader
 from OCP.TCollection import TCollection_AsciiString, TCollection_ExtendedString
 from OCP.TDataStd import TDataStd_Name
 from OCP.TDF import TDF_Label, TDF_LabelSequence

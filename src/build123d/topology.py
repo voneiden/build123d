@@ -170,7 +170,6 @@ from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
     GeomAPI_Interpolate,
-    GeomAPI_IntCS,
     GeomAPI_PointsToBSpline,
     GeomAPI_PointsToBSplineSurface,
     GeomAPI_ProjectPointOnSurf,

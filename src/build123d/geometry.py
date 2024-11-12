@@ -51,14 +51,12 @@ from typing import (
     overload,
     TypeVar,
 )
-from typing_extensions import deprecated
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
-from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.BRepTools import BRepTools
 from OCP.Geom import Geom_BoundedSurface, Geom_Line, Geom_Plane
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS, GeomAPI_IntSS

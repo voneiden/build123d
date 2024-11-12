@@ -29,7 +29,6 @@ license:
 from __future__ import annotations
 
 import copy
-import warnings
 from math import copysign, cos, radians, sin, sqrt
 from scipy.optimize import minimize
 from typing import Iterable, Union
