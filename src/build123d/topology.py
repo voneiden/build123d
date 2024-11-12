@@ -2927,10 +2927,10 @@ class Shape(NodeMixin):
         # Is left or right the inside?
         perimeter_length = perimeter.length
         left_perimeter_length = (
-            sum(e.length for e in left.edges()) if not left is None else 0
+            sum(e.length for e in left.edges()) if left is not None else 0
         )
         right_perimeter_length = (
-            sum(e.length for e in right.edges()) if not right is None else 0
+            sum(e.length for e in right.edges()) if right is not None else 0
         )
         left_inside = abs(perimeter_length - left_perimeter_length) < abs(
             perimeter_length - right_perimeter_length
@@ -8700,11 +8700,11 @@ class Wire(Mixin1D, Shape):
             edge1 = points_lookup[simplice[1]][0]
             # Look for connecting edges between edges
             if edge0 != edge1:
-                if not edge0 in trim_points:
+                if edge0 not in trim_points:
                     trim_points[edge0] = [simplice[0]]
                 else:
                     trim_points[edge0].append(simplice[0])
-                if not edge1 in trim_points:
+                if edge1 not in trim_points:
                     trim_points[edge1] = [simplice[1]]
                 else:
                     trim_points[edge1].append(simplice[1])
@@ -8718,7 +8718,7 @@ class Wire(Mixin1D, Shape):
             elif abs(simplice[0] - simplice[1]) != 1:
                 start_pnt = min(simplice.tolist())
                 end_pnt = max(simplice.tolist())
-                if not edge0 in trim_points:
+                if edge0 not in trim_points:
                     trim_points[edge0] = [start_pnt, end_pnt]
                 else:
                     trim_points[edge0].extend([start_pnt, end_pnt])
@@ -8796,7 +8796,7 @@ class Wire(Mixin1D, Shape):
             center_point = Vector(center)
 
         # Project the wire on the target object
-        if not direction_vector is None:
+        if direction_vector is not None:
             projection_object = BRepProj_Projection(
                 self.wrapped,
                 Shape.cast(target_object.wrapped).wrapped,
