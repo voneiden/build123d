@@ -453,7 +453,7 @@ class Mixin1D:
         else:
             try:
                 pnt = Vector(position)
-            except:
+            except Exception:
                 raise ValueError("position must be a float or a point")
             # GeomAPI_ProjectPointOnCurve only works with Edges so find
             # the closest Edge if the shape has multiple Edges.
@@ -1848,7 +1848,7 @@ class Shape(NodeMixin):
         try:
             upgrader.Build()
             self.wrapped = downcast(upgrader.Shape())
-        except:  # pylint: disable=bare-except
+        except Exception:
             warnings.warn(f"Unable to clean {self}")
         return self
 
@@ -7589,7 +7589,7 @@ class Solid(Mixin3D, Shape):
                         .solids()
                         .sort_by(direction_axis)[0]
                     )
-                except:  # pylint: disable=bare-except
+                except Exception:
                     warnings.warn("clipping error - extrusion may be incorrect")
         else:
             extrusion_parts = [extrusion.intersect(target_object)]
@@ -7600,7 +7600,7 @@ class Solid(Mixin3D, Shape):
                         .solids()
                         .sort_by(direction_axis)[0]
                     )
-                except:  # pylint: disable=bare-except
+                except Exception:
                     warnings.warn("clipping error - extrusion may be incorrect")
             extrusion = Shape.fuse(*extrusion_parts)
 

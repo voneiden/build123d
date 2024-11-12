@@ -618,7 +618,7 @@ def offset(
                     )
                 else:
                     inner_wires.append(offset_wire)
-            except:
+            except Exception:
                 pass
         # inner wires may go beyond the outer wire so subtract faces
         new_face = Face(outer_wire)

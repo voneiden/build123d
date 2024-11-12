@@ -386,7 +386,7 @@ class Builder(ABC):
                                 x_dir=(1, 0, 0),
                                 z_dir=new_face.normal_at(),
                             )
-                        except:
+                        except Exception:
                             plane = Plane(origin=(0, 0, 0), z_dir=new_face.normal_at())
 
                         new_face = plane.to_local_coords(new_face)
@@ -1291,7 +1291,7 @@ T2 = TypeVar("T2")
 
 
 def __gen_context_component_getter(
-    func: Callable[Concatenate[Builder, P], T2]
+    func: Callable[Concatenate[Builder, P], T2],
 ) -> Callable[P, T2]:
     @functools.wraps(func)
     def getter(select: Select = Select.ALL):
