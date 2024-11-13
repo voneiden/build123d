@@ -2530,15 +2530,27 @@ def to_align_offset(
     min_point: Sequence[float],
     max_point: Sequence[float],
     align: Sequence[Align],
+    center: Optional[Sequence[float]] = None,
 ) -> Vector:
     """Amount to move object to achieve the desired alignment"""
     align_offset = []
 
-    for alignment, min_coord, max_coord in zip(align, min_point, max_point):
+    if center is None:
+        center = [
+            (min_coord + max_coord) / 2
+            for min_coord, max_coord in zip(min_point, max_point)
+        ]
+
+    for alignment, min_coord, max_coord, center_coord in zip(
+        align,
+        min_point,
+        max_point,
+        center,
+    ):
         if alignment == Align.MIN:
             align_offset.append(-min_coord)
         elif alignment == Align.CENTER:
-            align_offset.append(-(min_coord + max_coord) / 2)
+            align_offset.append(-center_coord)
         elif alignment == Align.MAX:
             align_offset.append(-max_coord)
         elif alignment == Align.NONE:

@@ -311,7 +311,7 @@ class RegularPolygon(BaseSketchObject):
         side_count: int,
         major_radius: bool = True,
         rotation: float = 0,
-        align: tuple[Align, Align] = (Align.NONE, Align.NONE),
+        align: tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         # pylint: disable=too-many-locals
@@ -353,7 +353,7 @@ class RegularPolygon(BaseSketchObject):
 
         if align is not None:
             align = tuplify(align, 2)
-            align_offset = to_align_offset(mins, maxs, align)
+            align_offset = to_align_offset(mins, maxs, align, center=(0, 0))
         else:
             align_offset = Vector(0, 0)
         pts = [point + align_offset for point in pts]

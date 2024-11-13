@@ -258,7 +258,7 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertEqual(r.radius, 2)
         self.assertEqual(r.side_count, 6)
         self.assertEqual(r.rotation, 0)
-        self.assertEqual(r.align, (Align.NONE, Align.NONE))
+        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(r.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 2) * 2**2, 5)
         self.assertTupleAlmostEquals(
@@ -272,7 +272,7 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertAlmostEqual(r.radius, 1, 5)
         self.assertEqual(r.side_count, 3)
         self.assertEqual(r.rotation, 0)
-        self.assertEqual(r.align, (Align.NONE, Align.NONE))
+        self.assertEqual(r.align, (Align.CENTER, Align.CENTER))
         self.assertEqual(r.mode, Mode.ADD)
         self.assertAlmostEqual(test.sketch.area, (3 * sqrt(3) / 4) * (0.5 * 2) ** 2, 5)
         self.assertTupleAlmostEquals(
