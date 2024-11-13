@@ -620,7 +620,7 @@ class TechnicalDrawing(BaseSketchObject):
     def __init__(
         self,
         designed_by: str = "build123d",
-        design_date: date = date.today(),
+        design_date: Optional[date] = None,
         page_size: PageSize = PageSize.A4,
         title: str = "Title",
         sub_title: str = "Sub Title",
@@ -632,6 +632,9 @@ class TechnicalDrawing(BaseSketchObject):
         mode: Mode = Mode.ADD,
     ):
         # pylint: disable=too-many-locals
+
+        if design_date is None:
+            design_date = date.today()
 
         page_dim = TechnicalDrawing.page_sizes[page_size]
         # Frame

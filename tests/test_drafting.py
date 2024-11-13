@@ -30,6 +30,8 @@ import math
 import unittest
 from datetime import date
 
+import pytest
+
 from build123d import (
     IN,
     Axis,
@@ -295,13 +297,13 @@ class ExtensionLineTestCase(unittest.TestCase):
             )
 
 
-class TestTechnicalDrawing(unittest.TestCase):
-    def test_basic_drawing(self):
-        drawing = TechnicalDrawing(design_date=date(2023, 9, 17), sheet_number=1)
-        bbox = drawing.bounding_box()
-        self.assertGreater(bbox.size.X, 280)
-        self.assertGreater(bbox.size.Y, 195)
-        self.assertGreater(len(drawing.faces()), 110)
+@pytest.mark.parametrize("design_date", [date(2023, 9, 17), None])
+def test_basic_drawing(design_date):
+    drawing = TechnicalDrawing(design_date=design_date, sheet_number=1)
+    bbox = drawing.bounding_box()
+    assert bbox.size.X > 280
+    assert bbox.size.Y > 195
+    assert len(drawing.faces()) > 110
 
 
 if __name__ == "__main__":
