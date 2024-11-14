@@ -82,7 +82,7 @@ from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
 from OCP.TopLoc import TopLoc_Location
 from OCP.TopoDS import TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
-from build123d.build_enums import Align, Intrinsic, Extrinsic
+from build123d.build_enums import Align, Align2DType, Align3DType, Intrinsic, Extrinsic
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -1019,7 +1019,7 @@ class BoundBox:
             and second_box.max.Z < self.max.Z
         )
 
-    def to_align_offset(self, align: Sequence[Align]) -> Vector:
+    def to_align_offset(self, align: Union[Align2DType, Align3DType]) -> Vector:
         """Amount to move object to achieve the desired alignment"""
         return to_align_offset(self.min.to_tuple(), self.max.to_tuple(), align)
 
@@ -2527,22 +2527,28 @@ class Plane(metaclass=PlaneMeta):
 
 
 def to_align_offset(
-    min_point: Sequence[float],
-    max_point: Sequence[float],
-    align: Sequence[Align],
-    center: Optional[Sequence[float]] = None,
+    min_point: VectorLike,
+    max_point: VectorLike,
+    align: Union[Align2DType, Align3DType],
+    center: Optional[VectorLike] = None,
 ) -> Vector:
     """Amount to move object to achieve the desired alignment"""
     align_offset = []
 
     if center is None:
-        center = [
-            (min_coord + max_coord) / 2
-            for min_coord, max_coord in zip(min_point, max_point)
-        ]
+        center = (Vector(min_point) + Vector(max_point)) / 2
+
+    if align is None or align is Align.NONE:
+        return Vector(0, 0, 0)
+    if align is Align.MIN:
+        return Vector(min_point)
+    if align is Align.MAX:
+        return Vector(max_point)
+    if align is Align.CENTER:
+        return Vector(center)
 
     for alignment, min_coord, max_coord, center_coord in zip(
-        align,
+        map(Align, align),
         min_point,
         max_point,
         center,

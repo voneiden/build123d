@@ -351,11 +351,7 @@ class RegularPolygon(BaseSketchObject):
         mins = [pts_sorted[0][0].X, pts_sorted[1][0].Y]
         maxs = [pts_sorted[0][-1].X, pts_sorted[1][-1].Y]
 
-        if align is not None:
-            align = tuplify(align, 2)
-            align_offset = to_align_offset(mins, maxs, align, center=(0, 0))
-        else:
-            align_offset = Vector(0, 0)
+        align_offset = to_align_offset(mins, maxs, align, center=(0, 0))
         pts = [point + align_offset for point in pts]
 
         face = Face(Wire.make_polygon(pts))
