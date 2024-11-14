@@ -301,7 +301,7 @@ def make_brake_formed(
             line = line.wires()[0]
         elif not isinstance(line, (Edge, Wire)):
             raise ValueError("line must be either a Curve, Edge or Wire")
-    elif context is not None and not context.pending_edges_as_wire is None:
+    elif context is not None and context.pending_edges_as_wire is not None:
         line = context.pending_edges_as_wire
     else:
         raise ValueError("A line must be provided")

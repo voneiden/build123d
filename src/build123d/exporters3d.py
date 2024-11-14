@@ -124,7 +124,7 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
             elif isinstance(node, Curve):
                 explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_EDGE)
             else:
-                warnings.warn("Unknown Compound type, color not set")
+                warnings.warn("Unknown Compound type, color not set", stacklevel=2)
                 explorer = TopExp_Explorer()  # don't know what to look for
 
             while explorer.More():

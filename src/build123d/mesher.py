@@ -83,7 +83,6 @@ license:
 # pylint: disable=no-name-in-module, import-error
 import copy
 import ctypes
-import itertools
 import math
 import os
 import sys
@@ -103,7 +102,6 @@ from OCP.BRepMesh import BRepMesh_IncrementalMesh
 from OCP.gp import gp_Pnt
 import OCP.TopAbs as ta
 from OCP.GProp import GProp_GProps
-from OCP.ShapeFix import ShapeFix_Shape
 from OCP.TopAbs import TopAbs_ShapeEnum
 from OCP.TopExp import TopExp_Explorer
 from OCP.TopoDS import TopoDS_Compound
@@ -111,8 +109,8 @@ from OCP.TopLoc import TopLoc_Location
 
 from py_lib3mf import Lib3MF
 from build123d.build_enums import MeshType, Unit
-from build123d.geometry import Color, TOLERANCE, Vector
-from build123d.topology import Compound, Face, Shape, Shell, Solid, downcast
+from build123d.geometry import Color, TOLERANCE
+from build123d.topology import Compound, Shape, Shell, Solid, downcast
 
 
 class Mesher:
@@ -400,7 +398,10 @@ class Mesher:
 
             # Skip invalid meshes
             if len(ocp_mesh_vertices) < 3 or not triangles:
-                warnings.warn(f"Degenerate shape {b3d_shape} - skipped")
+                warnings.warn(
+                    f"Degenerate shape {b3d_shape} - skipped",
+                    stacklevel=2,
+                )
                 continue
 
             # Create 3mf mesh inputs
@@ -429,7 +430,7 @@ class Mesher:
             if not mesh_3mf.IsValid():
                 raise RuntimeError("3mf mesh is invalid")
             if not mesh_3mf.IsManifoldAndOriented():
-                warnings.warn("3mf mesh is not manifold")
+                warnings.warn("3mf mesh is not manifold", stacklevel=2)
 
             # Add mesh to model
             self.meshes.append(mesh_3mf)

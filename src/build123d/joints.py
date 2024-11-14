@@ -29,7 +29,7 @@ license:
 from __future__ import annotations
 
 from math import inf
-from typing import Union, overload
+from typing import Optional, Union, overload
 
 from build123d.build_common import validate_inputs
 from build123d.build_enums import Align
@@ -75,8 +75,8 @@ class RigidJoint(Joint):
     def __init__(
         self,
         label: str,
-        to_part: Union[Solid, Compound] = None,
-        joint_location: Location = Location(),
+        to_part: Optional[Union[Solid, Compound]] = None,
+        joint_location: Union[Location, None] = None,
     ):
         context: BuildPart = BuildPart._get_context(self)
         validate_inputs(context, self)
@@ -85,6 +85,9 @@ class RigidJoint(Joint):
                 to_part = context
             else:
                 raise ValueError("Either specify to_part or place in BuildPart scope")
+
+        if joint_location is None:
+            joint_location = Location()
 
         self.relative_location = to_part.location.inverse() * joint_location
         to_part.joints[label] = self
@@ -677,8 +680,8 @@ class BallJoint(Joint):
     def __init__(
         self,
         label: str,
-        to_part: Union[Solid, Compound] = None,
-        joint_location: Location = Location(),
+        to_part: Optional[Union[Solid, Compound]] = None,
+        joint_location: Optional[Location] = None,
         angular_range: tuple[
             tuple[float, float], tuple[float, float], tuple[float, float]
         ] = ((0, 360), (0, 360), (0, 360)),
@@ -691,6 +694,9 @@ class BallJoint(Joint):
                 to_part = context
             else:
                 raise ValueError("Either specify to_part or place in BuildPart scope")
+
+        if joint_location is None:
+            joint_location = Location()
 
         self.relative_location = to_part.location.inverse() * joint_location
         to_part.joints[label] = self

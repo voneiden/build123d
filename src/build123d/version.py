@@ -12,7 +12,8 @@ except Exception:  # pylint: disable=broad-exception-caught
 
     warnings.warn(
         f'could not determine {__name__.split(".", maxsplit=1)[0]} package version; '
-        "this indicates a broken installation"
+        "this indicates a broken installation",
+        stacklevel=2,
     )
     del warnings
 

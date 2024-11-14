@@ -170,7 +170,6 @@ from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
     GeomAPI_Interpolate,
-    GeomAPI_IntCS,
     GeomAPI_PointsToBSpline,
     GeomAPI_PointsToBSplineSurface,
     GeomAPI_ProjectPointOnSurf,
@@ -453,7 +452,7 @@ class Mixin1D:
         else:
             try:
                 pnt = Vector(position)
-            except:
+            except Exception:
                 raise ValueError("position must be a float or a point")
             # GeomAPI_ProjectPointOnCurve only works with Edges so find
             # the closest Edge if the shape has multiple Edges.
@@ -1848,8 +1847,11 @@ class Shape(NodeMixin):
         try:
             upgrader.Build()
             self.wrapped = downcast(upgrader.Shape())
-        except:  # pylint: disable=bare-except
-            warnings.warn(f"Unable to clean {self}")
+        except Exception:
+            warnings.warn(
+                f"Unable to clean {self}",
+                stacklevel=2,
+            )
         return self
 
     def fix(self) -> Self:
@@ -2207,7 +2209,10 @@ class Shape(NodeMixin):
         vertices = self.vertices()
         vertex_count = len(vertices)
         if vertex_count != 1:
-            warnings.warn(f"Found {vertex_count} vertices, returning first")
+            warnings.warn(
+                f"Found {vertex_count} vertices, returning first",
+                stacklevel=2,
+            )
         return vertices[0]
 
     def edges(self) -> ShapeList[Edge]:
@@ -2228,7 +2233,10 @@ class Shape(NodeMixin):
         edges = self.edges()
         edge_count = len(edges)
         if edge_count != 1:
-            warnings.warn(f"Found {edge_count} edges, returning first")
+            warnings.warn(
+                f"Found {edge_count} edges, returning first",
+                stacklevel=2,
+            )
         return edges[0]
 
     def compounds(self) -> ShapeList[Compound]:
@@ -2246,7 +2254,10 @@ class Shape(NodeMixin):
         compounds = self.compounds()
         compound_count = len(compounds)
         if compound_count != 1:
-            warnings.warn(f"Found {compound_count} compounds, returning first")
+            warnings.warn(
+                f"Found {compound_count} compounds, returning first",
+                stacklevel=2,
+            )
         return compounds[0]
 
     def wires(self) -> ShapeList[Wire]:
@@ -2258,7 +2269,10 @@ class Shape(NodeMixin):
         wires = self.wires()
         wire_count = len(wires)
         if wire_count != 1:
-            warnings.warn(f"Found {wire_count} wires, returning first")
+            warnings.warn(
+                f"Found {wire_count} wires, returning first",
+                stacklevel=2,
+            )
         return wires[0]
 
     def faces(self) -> ShapeList[Face]:
@@ -2274,7 +2288,7 @@ class Shape(NodeMixin):
         face_count = len(faces)
         if face_count != 1:
             msg = f"Found {face_count} faces, returning first"
-            warnings.warn(msg)
+            warnings.warn(msg, stacklevel=2)
         return faces[0]
 
     def shells(self) -> ShapeList[Shell]:
@@ -2286,7 +2300,10 @@ class Shape(NodeMixin):
         shells = self.shells()
         shell_count = len(shells)
         if shell_count != 1:
-            warnings.warn(f"Found {shell_count} shells, returning first")
+            warnings.warn(
+                f"Found {shell_count} shells, returning first",
+                stacklevel=2,
+            )
         return shells[0]
 
     def solids(self) -> ShapeList[Solid]:
@@ -2298,7 +2315,10 @@ class Shape(NodeMixin):
         solids = self.solids()
         solid_count = len(solids)
         if solid_count != 1:
-            warnings.warn(f"Found {solid_count} solids, returning first")
+            warnings.warn(
+                f"Found {solid_count} solids, returning first",
+                stacklevel=2,
+            )
         return solids[0]
 
     @property
@@ -2907,10 +2927,10 @@ class Shape(NodeMixin):
         # Is left or right the inside?
         perimeter_length = perimeter.length
         left_perimeter_length = (
-            sum(e.length for e in left.edges()) if not left is None else 0
+            sum(e.length for e in left.edges()) if left is not None else 0
         )
         right_perimeter_length = (
-            sum(e.length for e in right.edges()) if not right is None else 0
+            sum(e.length for e in right.edges()) if right is not None else 0
         )
         left_inside = abs(perimeter_length - left_perimeter_length) < abs(
             perimeter_length - right_perimeter_length
@@ -3773,7 +3793,10 @@ class ShapeList(list[T]):
         vertices = self.vertices()
         vertex_count = len(vertices)
         if vertex_count != 1:
-            warnings.warn(f"Found {vertex_count} vertices, returning first")
+            warnings.warn(
+                f"Found {vertex_count} vertices, returning first",
+                stacklevel=2,
+            )
         return vertices[0]
 
     def edges(self) -> ShapeList[Edge]:
@@ -3785,7 +3808,10 @@ class ShapeList(list[T]):
         edges = self.edges()
         edge_count = len(edges)
         if edge_count != 1:
-            warnings.warn(f"Found {edge_count} edges, returning first")
+            warnings.warn(
+                f"Found {edge_count} edges, returning first",
+                stacklevel=2,
+            )
         return edges[0]
 
     def wires(self) -> ShapeList[Wire]:
@@ -3797,7 +3823,10 @@ class ShapeList(list[T]):
         wires = self.wires()
         wire_count = len(wires)
         if wire_count != 1:
-            warnings.warn(f"Found {wire_count} wires, returning first")
+            warnings.warn(
+                f"Found {wire_count} wires, returning first",
+                stacklevel=2,
+            )
         return wires[0]
 
     def faces(self) -> ShapeList[Face]:
@@ -3810,7 +3839,7 @@ class ShapeList(list[T]):
         face_count = len(faces)
         if face_count != 1:
             msg = f"Found {face_count} faces, returning first"
-            warnings.warn(msg)
+            warnings.warn(msg, stacklevel=2)
         return faces[0]
 
     def shells(self) -> ShapeList[Shell]:
@@ -3822,7 +3851,10 @@ class ShapeList(list[T]):
         shells = self.shells()
         shell_count = len(shells)
         if shell_count != 1:
-            warnings.warn(f"Found {shell_count} shells, returning first")
+            warnings.warn(
+                f"Found {shell_count} shells, returning first",
+                stacklevel=2,
+            )
         return shells[0]
 
     def solids(self) -> ShapeList[Solid]:
@@ -3834,7 +3866,10 @@ class ShapeList(list[T]):
         solids = self.solids()
         solid_count = len(solids)
         if solid_count != 1:
-            warnings.warn(f"Found {solid_count} solids, returning first")
+            warnings.warn(
+                f"Found {solid_count} solids, returning first",
+                stacklevel=2,
+            )
         return solids[0]
 
     def compounds(self) -> ShapeList[Compound]:
@@ -3846,7 +3881,10 @@ class ShapeList(list[T]):
         compounds = self.compounds()
         compound_count = len(compounds)
         if compound_count != 1:
-            warnings.warn(f"Found {compound_count} compounds, returning first")
+            warnings.warn(
+                f"Found {compound_count} compounds, returning first",
+                stacklevel=2,
+            )
         return compounds[0]
 
     def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
@@ -5947,7 +5985,10 @@ class Face(Shape):
     def wire(self) -> Wire:
         """Return the outerwire, generate a warning if inner_wires present"""
         if self.inner_wires():
-            warnings.warn("Found holes, returning outer_wire")
+            warnings.warn(
+                "Found holes, returning outer_wire",
+                stacklevel=2,
+            )
         return self.outer_wire()
 
     @classmethod
@@ -6718,7 +6759,6 @@ class Face(Shape):
             projection = projection_faces.pop(0).fuse(*projection_faces).clean()
 
         return projection
-        return target_projected_edges
 
     def make_holes(self, interior_wires: list[Wire]) -> Face:
         """Make Holes in Face
@@ -7589,8 +7629,11 @@ class Solid(Mixin3D, Shape):
                         .solids()
                         .sort_by(direction_axis)[0]
                     )
-                except:  # pylint: disable=bare-except
-                    warnings.warn("clipping error - extrusion may be incorrect")
+                except Exception:
+                    warnings.warn(
+                        "clipping error - extrusion may be incorrect",
+                        stacklevel=2,
+                    )
         else:
             extrusion_parts = [extrusion.intersect(target_object)]
             for clipping_object in clipping_objects:
@@ -7600,8 +7643,11 @@ class Solid(Mixin3D, Shape):
                         .solids()
                         .sort_by(direction_axis)[0]
                     )
-                except:  # pylint: disable=bare-except
-                    warnings.warn("clipping error - extrusion may be incorrect")
+                except Exception:
+                    warnings.warn(
+                        "clipping error - extrusion may be incorrect",
+                        stacklevel=2,
+                    )
             extrusion = Shape.fuse(*extrusion_parts)
 
         return extrusion
@@ -8420,7 +8466,7 @@ class Wire(Mixin1D, Shape):
         wire_builder.Build()
         if not wire_builder.IsDone():
             if wire_builder.Error() == BRepBuilderAPI_NonManifoldWire:
-                warnings.warn("Wire is non manifold")
+                warnings.warn("Wire is non manifold", stacklevel=2)
             elif wire_builder.Error() == BRepBuilderAPI_EmptyWire:
                 raise RuntimeError("Wire is empty")
             elif wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
@@ -8653,11 +8699,11 @@ class Wire(Mixin1D, Shape):
             edge1 = points_lookup[simplice[1]][0]
             # Look for connecting edges between edges
             if edge0 != edge1:
-                if not edge0 in trim_points:
+                if edge0 not in trim_points:
                     trim_points[edge0] = [simplice[0]]
                 else:
                     trim_points[edge0].append(simplice[0])
-                if not edge1 in trim_points:
+                if edge1 not in trim_points:
                     trim_points[edge1] = [simplice[1]]
                 else:
                     trim_points[edge1].append(simplice[1])
@@ -8671,7 +8717,7 @@ class Wire(Mixin1D, Shape):
             elif abs(simplice[0] - simplice[1]) != 1:
                 start_pnt = min(simplice.tolist())
                 end_pnt = max(simplice.tolist())
-                if not edge0 in trim_points:
+                if edge0 not in trim_points:
                     trim_points[edge0] = [start_pnt, end_pnt]
                 else:
                     trim_points[edge0].extend([start_pnt, end_pnt])
@@ -8749,7 +8795,7 @@ class Wire(Mixin1D, Shape):
             center_point = Vector(center)
 
         # Project the wire on the target object
-        if not direction_vector is None:
+        if direction_vector is not None:
             projection_object = BRepProj_Projection(
                 self.wrapped,
                 Shape.cast(target_object.wrapped).wrapped,

@@ -386,7 +386,7 @@ class Builder(ABC):
                                 x_dir=(1, 0, 0),
                                 z_dir=new_face.normal_at(),
                             )
-                        except:
+                        except Exception:
                             plane = Plane(origin=(0, 0, 0), z_dir=new_face.normal_at())
 
                         new_face = plane.to_local_coords(new_face)
@@ -521,7 +521,10 @@ class Builder(ABC):
         all_vertices = self.vertices(select)
         vertex_count = len(all_vertices)
         if vertex_count != 1:
-            warnings.warn(f"Found {vertex_count} vertices, returning first")
+            warnings.warn(
+                f"Found {vertex_count} vertices, returning first",
+                stacklevel=2,
+            )
         return all_vertices[0]
 
     def edges(self, select: Select = Select.ALL) -> ShapeList[Edge]:
@@ -561,7 +564,10 @@ class Builder(ABC):
         all_edges = self.edges(select)
         edge_count = len(all_edges)
         if edge_count != 1:
-            warnings.warn(f"Found {edge_count} edges, returning first")
+            warnings.warn(
+                f"Found {edge_count} edges, returning first",
+                stacklevel=2,
+            )
         return all_edges[0]
 
     def wires(self, select: Select = Select.ALL) -> ShapeList[Wire]:
@@ -601,7 +607,10 @@ class Builder(ABC):
         all_wires = self.wires(select)
         wire_count = len(all_wires)
         if wire_count != 1:
-            warnings.warn(f"Found {wire_count} wires, returning first")
+            warnings.warn(
+                f"Found {wire_count} wires, returning first",
+                stacklevel=2,
+            )
         return all_wires[0]
 
     def faces(self, select: Select = Select.ALL) -> ShapeList[Face]:
@@ -641,7 +650,10 @@ class Builder(ABC):
         all_faces = self.faces(select)
         face_count = len(all_faces)
         if face_count != 1:
-            warnings.warn(f"Found {face_count} faces, returning first")
+            warnings.warn(
+                f"Found {face_count} faces, returning first",
+                stacklevel=2,
+            )
         return all_faces[0]
 
     def solids(self, select: Select = Select.ALL) -> ShapeList[Solid]:
@@ -681,7 +693,10 @@ class Builder(ABC):
         all_solids = self.solids(select)
         solid_count = len(all_solids)
         if solid_count != 1:
-            warnings.warn(f"Found {solid_count} solids, returning first")
+            warnings.warn(
+                f"Found {solid_count} solids, returning first",
+                stacklevel=2,
+            )
         return all_solids[0]
 
     def _shapes(self, obj_type: Union[Vertex, Edge, Face, Solid] = None) -> ShapeList:
@@ -1291,7 +1306,7 @@ T2 = TypeVar("T2")
 
 
 def __gen_context_component_getter(
-    func: Callable[Concatenate[Builder, P], T2]
+    func: Callable[Concatenate[Builder, P], T2],
 ) -> Callable[P, T2]:
     @functools.wraps(func)
     def getter(select: Select = Select.ALL):

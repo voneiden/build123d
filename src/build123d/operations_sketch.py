@@ -45,7 +45,6 @@ from build123d.topology import (
 from build123d.geometry import Vector
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_sketch import BuildSketch
-from build123d.objects_curve import ThreePointArc
 from scipy.spatial import Voronoi
 
 
