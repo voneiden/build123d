@@ -27,8 +27,11 @@ license:
 """
 
 from __future__ import annotations
+
 from enum import Enum, auto
-from typing import Union, TypeAlias
+from typing import Union
+
+from typing_extensions import TypeAlias
 
 
 class Align(Enum):
