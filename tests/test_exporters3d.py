@@ -30,12 +30,15 @@ import os
 import re
 import unittest
 from typing import Optional
+from pathlib import Path
+
+import pytest
 
 from build123d.build_common import GridLocations
 from build123d.build_enums import Unit
 from build123d.build_line import BuildLine
 from build123d.build_sketch import BuildSketch
-from build123d.exporters3d import export_gltf, export_step
+from build123d.exporters3d import export_gltf, export_step, export_brep, export_stl
 from build123d.geometry import Color, Pos, Vector, VectorLike
 from build123d.objects_curve import Line
 from build123d.objects_part import Box, Sphere
@@ -163,6 +166,18 @@ class TestExportGltf(DirectApiTestCase):
     #     os.chmod("box.gltf", 0o777)  # Make the file read/write
     #     os.remove("box.gltf")
     #     os.remove("box.bin")
+
+
+@pytest.mark.parametrize(
+    "format", (Path, os.fsencode, os.fsdecode), ids=["path", "bytes", "str"]
+)
+@pytest.mark.parametrize(
+    "exporter", (export_gltf, export_stl, export_step, export_brep)
+)
+def test_pathlike_exporters(tmp_path, format, exporter):
+    path = format(tmp_path / "file")
+    box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
+    exporter(box, path)
 
 
 if __name__ == "__main__":
