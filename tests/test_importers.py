@@ -1,20 +1,25 @@
 from io import StringIO
 import os
+from os import fsencode, fsdecode
 import unittest
 import urllib.request
 import tempfile
+from pathlib import Path
+
+import pytest
+
 from build123d import BuildLine, Color, Line, Bezier, RadiusArc, Solid, Compound
 from build123d.importers import (
     import_svg_as_buildline_code,
     import_brep,
     import_svg,
     import_step,
+    import_stl,
 )
 from build123d.geometry import Pos
 from build123d.exporters import ExportSVG
-from build123d.exporters3d import export_step
+from build123d.exporters3d import export_brep, export_step
 from build123d.build_enums import GeomType
-from pathlib import Path
 
 
 class ImportSVG(unittest.TestCase):
@@ -105,7 +110,6 @@ class ImportBREP(unittest.TestCase):
 
 
 class ImportSTEP(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         """setUpClass is a class method that is executed once for the entire test
@@ -169,6 +173,41 @@ class ImportSTEP(unittest.TestCase):
         fused = Solid.fuse(*assembly.solids())
         # If the parts where placed correctly they all touch and can be fused
         self.assertEqual(len(fused.solids()), 1)
+
+
+@pytest.mark.parametrize(
+    "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]
+)
+@pytest.mark.parametrize(
+    "importer,file",
+    [
+        (import_svg, Path(__file__).parent / "svg_import_test.svg"),
+        (import_svg_as_buildline_code, Path(__file__).parent / "svg_import_test.svg"),
+        (import_stl, Path(__file__).parent / "cyl_w_rect_hole.stl"),
+    ],
+    ids=["svg", "svg_code", "stl"],
+)
+def test_pathlike_import(format, importer, file):
+    file = format(file)
+    importer(file)
+
+
+@pytest.mark.parametrize(
+    "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]
+)
+def test_pathlike_step(format, tmp_path):
+    step_file = format(tmp_path / "test.step")
+    export_step(Solid.make_box(1, 1, 1), step_file)
+    import_step(step_file)
+
+
+@pytest.mark.parametrize(
+    "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]
+)
+def test_pathlike_brep(format, tmp_path):
+    brep_file = format(tmp_path / "test.brep")
+    export_brep(Solid.make_box(1, 1, 1), brep_file)
+    import_brep(brep_file)
 
 
 if __name__ == "__main__":
