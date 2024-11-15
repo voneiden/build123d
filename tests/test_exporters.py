@@ -1,6 +1,11 @@
-import unittest
-import math
+from os import fsdecode, fsencode
 from typing import Union, Iterable
+import math
+from pathlib import Path
+import unittest
+
+import pytest
+
 from build123d import (
     Color,
     Mode,
@@ -167,6 +172,19 @@ class ExportersTestCase(unittest.TestCase):
         )
         svg.add_shape(sketch)
         svg.write("test-colors.svg")
+
+
+@pytest.mark.parametrize(
+    "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]
+)
+@pytest.mark.parametrize("Exporter", (ExportSVG, ExportDXF))
+def test_pathlike_exporters(tmp_path, format, Exporter):
+    path = format(tmp_path / "file")
+    sketch = ExportersTestCase.create_test_sketch()
+    exporter = Exporter()
+    exporter.add_shape(sketch)
+    exporter.write(path)
+
 
 if __name__ == "__main__":
     unittest.main()
