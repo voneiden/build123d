@@ -1,5 +1,10 @@
 import unittest, uuid
 from packaging.specifiers import SpecifierSet
+from pathlib import Path
+from os import fsdecode, fsencode
+
+import pytest
+
 from build123d.build_enums import MeshType, Unit
 from build123d.build_part import BuildPart
 from build123d.build_sketch import BuildSketch
@@ -204,6 +209,17 @@ class TestImportDegenerateTriangles(unittest.TestCase):
         self.assertTrue(stl.is_manifold)
         self.assertTrue(stl.is_valid())
         self.assertEqual(sum(f.area == 0 for f in stl.faces()), 0)
+
+
+@pytest.mark.parametrize(
+    "format", (Path, fsencode, fsdecode), ids=["path", "bytes", "str"]
+)
+def test_pathlike_mesher(tmp_path, format):
+    path = format(tmp_path / "test.3mf")
+    exporter, importer = Mesher(), Mesher()
+    exporter.add_shape(Solid.make_box(1, 1, 1))
+    exporter.write(path)
+    importer.read(path)
 
 
 if __name__ == "__main__":

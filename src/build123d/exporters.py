@@ -32,9 +32,11 @@ license:
 
 import math
 import xml.etree.ElementTree as ET
-from enum import Enum, auto
-from typing import Callable, Iterable, Optional, Union, List, Tuple
 from copy import copy
+from enum import Enum, auto
+from os import PathLike, fsdecode, fspath
+from pathlib import Path
+from typing import Callable, Iterable, List, Optional, Tuple, Union
 
 import ezdxf
 import svgpathtools as PT
@@ -633,13 +635,13 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def write(self, file_name: str):
+    def write(self, file_name: Union[PathLike, str, bytes]):
         """write
 
         Writes the DXF data to the specified file name.
 
         Args:
-            file_name (str): The file name (including path) where the DXF data will
+            file_name (Union[PathLike, str, bytes]): The file name (including path) where the DXF data will
                 be written.
         """
         # Reset the main CAD viewport of the model space to the
@@ -647,8 +649,7 @@ class ExportDXF(Export2D):
         # https://github.com/gumyr/build123d/issues/382 tracks
         # exposing viewport control to the user.
         zoom.extents(self._modelspace)
-
-        self._document.saveas(file_name)
+        self._document.saveas(fsdecode(file_name))
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -877,7 +878,7 @@ class ExportSVG(Export2D):
             line_type: LineType,
         ):
             def convert_color(
-                c: Union[ColorIndex, RGB, Color, None]
+                c: Union[ColorIndex, RGB, Color, None],
             ) -> Union[Color, None]:
                 if isinstance(c, ColorIndex):
                     # The easydxf color indices BLACK and WHITE have the same
@@ -1390,7 +1391,6 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _group_for_layer(self, layer: _Layer, attribs: dict = None) -> ET.Element:
-
         def _color_attribs(c: Color) -> Tuple[str, str]:
             if c:
                 (r, g, b, a) = tuple(c)
@@ -1428,13 +1428,13 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def write(self, path: str):
+    def write(self, path: Union[PathLike, str, bytes]):
         """write
 
         Writes the SVG data to the specified file path.
 
         Args:
-            path (str): The file path where the SVG data will be written.
+            path (Union[PathLike, str, bytes]): The file path where the SVG data will be written.
         """
         # pylint: disable=too-many-locals
         bb = self._bounds
