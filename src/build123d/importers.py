@@ -30,9 +30,11 @@ license:
 # pylint: disable=no-name-in-module, import-error
 
 import os
+from os import PathLike, fsdecode
+import unicodedata
 from math import degrees
 from pathlib import Path
-from typing import TextIO, Union, Optional
+from typing import Optional, TextIO, Union
 
 from OCP.BRep import BRep_Builder
 from OCP.BRepGProp import BRepGProp
@@ -65,7 +67,6 @@ from OCP.XCAFDoc import (
 )
 from ocpsvg import ColorAndLabel, import_svg_document
 from svgpathtools import svg2paths
-import unicodedata
 
 from build123d.geometry import Color, Location
 from build123d.topology import (
@@ -92,11 +93,11 @@ topods_lut = {
 }
 
 
-def import_brep(file_name: str) -> Shape:
+def import_brep(file_name: Union[PathLike, str, bytes]) -> Shape:
     """Import shape from a BREP file
 
     Args:
-        file_name (str): brep file
+        file_name (Union[PathLike, str, bytes]): brep file
 
     Raises:
         ValueError: file not found
@@ -107,7 +108,7 @@ def import_brep(file_name: str) -> Shape:
     shape = TopoDS_Shape()
     builder = BRep_Builder()
 
-    BRepTools.Read_s(shape, file_name, builder)
+    BRepTools.Read_s(shape, fsdecode(file_name), builder)
 
     if shape.IsNull():
         raise ValueError(f"Could not import {file_name}")
@@ -115,13 +116,13 @@ def import_brep(file_name: str) -> Shape:
     return Shape.cast(shape)
 
 
-def import_step(filename: str) -> Compound:
+def import_step(filename: Union[PathLike, str, bytes]) -> Compound:
     """import_step
 
     Extract shapes from a STEP file and return them as a Compound object.
 
     Args:
-        file_name (str): file path of STEP file to import
+        file_name (Union[PathLike, str, bytes]): file path of STEP file to import
 
     Raises:
         ValueError: can't open file
@@ -214,7 +215,7 @@ def import_step(filename: str) -> Compound:
     reader.SetNameMode(True)
     reader.SetColorMode(True)
     reader.SetLayerMode(True)
-    reader.ReadFile(filename)
+    reader.ReadFile(fsdecode(filename))
     reader.Transfer(doc)
 
     root = Compound()
@@ -227,7 +228,7 @@ def import_step(filename: str) -> Compound:
     return root
 
 
-def import_stl(file_name: str) -> Face:
+def import_stl(file_name: Union[PathLike, str, bytes]) -> Face:
     """import_stl
 
     Extract shape from an STL file and return it as a Face reference object.
@@ -237,7 +238,7 @@ def import_stl(file_name: str) -> Face:
     of the STL file.
 
     Args:
-        file_name (str): file path of STL file to import
+        file_name (Union[PathLike, str, bytes]): file path of STL file to import
 
     Raises:
         ValueError: Could not import file
@@ -246,20 +247,22 @@ def import_stl(file_name: str) -> Face:
         Face: STL model
     """
     # Read and return the shape
-    reader = RWStl.ReadFile_s(file_name)
+    reader = RWStl.ReadFile_s(fsdecode(file_name))
     face = TopoDS_Face()
     BRep_Builder().MakeFace(face, reader)
     stl_obj = Face.cast(face)
     return stl_obj
 
 
-def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
+def import_svg_as_buildline_code(
+    file_name: Union[PathLike, str, bytes],
+) -> tuple[str, str]:
     """translate_to_buildline_code
 
     Translate the contents of the given svg file into executable build123d/BuildLine code.
 
     Args:
-        file_name (str): svg file name
+        file_name (Union[PathLike, str, bytes]): svg file name
 
     Returns:
         tuple[str, str]: code, builder instance name
@@ -280,6 +283,7 @@ def import_svg_as_buildline_code(file_name: str) -> tuple[str, str]:
             "sweep",
         ],
     }
+    file_name = fsdecode(file_name)
     paths_info = svg2paths(file_name)
     paths, _path_attributes = paths_info[0], paths_info[1]
     builder_name = os.path.basename(file_name).split(".")[0]

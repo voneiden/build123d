@@ -66,7 +66,6 @@ class DirectApiTestCase(unittest.TestCase):
 
 
 class TestExportStep(DirectApiTestCase):
-
     def test_export_step_solid(self):
         b = Box(1, 1, 1).locate(Pos(-1, -2, -3))
         self.assertTrue(export_step(b, "box.step"))
