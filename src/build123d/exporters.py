@@ -649,7 +649,7 @@ class ExportDXF(Export2D):
         # https://github.com/gumyr/build123d/issues/382 tracks
         # exposing viewport control to the user.
         zoom.extents(self._modelspace)
-        self._document.saveas(file_name)
+        self._document.saveas(fsdecode(file_name))
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
