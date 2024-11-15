@@ -25,6 +25,7 @@ license:
 
 """
 
+import io
 import json
 import os
 import re
@@ -178,6 +179,12 @@ def test_pathlike_exporters(tmp_path, format, exporter):
     path = format(tmp_path / "file")
     box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
     exporter(box, path)
+
+
+def test_export_brep_in_memory():
+    buffer = io.BytesIO()
+    box = Box(1, 1, 1).locate(Pos(-1, -2, -3))
+    export_brep(box, buffer)
 
 
 if __name__ == "__main__":
