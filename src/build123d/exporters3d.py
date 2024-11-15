@@ -29,6 +29,7 @@ license:
 # pylint has trouble with the OCP imports
 # pylint: disable=no-name-in-module, import-error
 
+from io import BytesIO
 import warnings
 from os import PathLike, fsdecode, fspath
 from typing import Union
@@ -155,18 +156,21 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
 
 def export_brep(
     to_export: Shape,
-    file_path: Union[PathLike, str, bytes],
+    file_path: Union[PathLike, str, bytes, BytesIO],
 ) -> bool:
     """Export this shape to a BREP file
 
     Args:
         to_export (Shape): object or assembly
-        file_path: Union[PathLike, str, bytes]: brep file path or memory buffer
+        file_path: Union[PathLike, str, bytes, BytesIO]: brep file path or memory buffer
 
     Returns:
         bool: write status
     """
-    return_value = BRepTools.Write_s(to_export.wrapped, fsdecode(file_path))
+    if not isinstance(file_path, BytesIO):
+        file_path = fsdecode(file_path)
+
+    return_value = BRepTools.Write_s(to_export.wrapped, file_path)
 
     return True if return_value is None else return_value
 
