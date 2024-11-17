@@ -458,6 +458,11 @@ class SlotCenterToCenter(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
+        if center_separation <= 0:
+            raise ValueError(
+                f"Requires center_separation > 0. Got: {center_separation=}"
+            )
+
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
