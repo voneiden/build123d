@@ -499,6 +499,11 @@ class SlotOverall(BaseSketchObject):
         align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
+        if width <= height:
+            raise ValueError(
+                f"Slot requires that width > height. Got: {width=}, {height=}"
+            )
+
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
