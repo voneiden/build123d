@@ -101,6 +101,12 @@ as well as large assemblies created using those parts. See
 `the OpenVMP robot <https://partcad.org/repository/package/robotics/multimodal/openvmp/robots/don1>`_
 as an example of an assembly
 
+gggears generator
+=================
+A gear generation framework that allows easy creation of a wide range of gears and drives.
+
+See `gggears <https://github.com/GarryBGoode/gggears>`_
+
 *****
 Tools
 *****
