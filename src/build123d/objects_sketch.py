@@ -425,6 +425,13 @@ class SlotCenterPoint(BaseSketchObject):
         self.slot_height = height
 
         half_line = point_v - center_v
+
+        if half_line.length * 2 <= height:
+            raise ValueError(
+                f"Slots must have width > height. "
+                "Got: {height=} width={half_line.length * 2} (computed)"
+            )
+
         face = Face(
             Wire.combine(
                 [
