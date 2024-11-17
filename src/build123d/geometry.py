@@ -2541,11 +2541,11 @@ def to_align_offset(
     if align is None or align is Align.NONE:
         return Vector(0, 0, 0)
     if align is Align.MIN:
-        return Vector(min_point)
+        return -Vector(min_point)
     if align is Align.MAX:
-        return Vector(max_point)
+        return -Vector(max_point)
     if align is Align.CENTER:
-        return Vector(center)
+        return -Vector(center)
 
     for alignment, min_coord, max_coord, center_coord in zip(
         map(Align, align),
