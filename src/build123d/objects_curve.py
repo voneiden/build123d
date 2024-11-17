@@ -40,35 +40,55 @@ from build123d.geometry import Axis, Plane, Vector, VectorLike, TOLERANCE
 from build123d.topology import Edge, Face, Wire, Curve
 
 
-class BaseLineObject(Wire):
-    """BaseLineObject
-
-    Base class for all BuildLine objects
+def _add_curve_to_context(curve, mode: Mode):
+    """Helper function to add a curve to the context.
 
     Args:
-        curve (Union[Edge,Wire]): edge to create
+        curve (Union[Wire, Edge]): curve to add to the context (either a Wire or an Edge).
+        mode (Mode): combination mode.
+    """
+    context: BuildLine = BuildLine._get_context(log=False)
+
+    if context is not None and isinstance(context, BuildLine):
+        if isinstance(curve, Wire):
+            context._add_to_context(*curve.edges(), mode=mode)
+        elif isinstance(curve, Edge):
+            context._add_to_context(curve, mode=mode)
+
+
+class BaseLineObject(Wire):
+    """BaseLineObject specialized for Wire.
+
+    Args:
+        curve (Wire): wire to create.
         mode (Mode, optional): combination mode. Defaults to Mode.ADD.
     """
 
     _applies_to = [BuildLine._tag]
 
-    def __init__(
-        self,
-        curve: Union[Edge, Wire],
-        mode: Mode = Mode.ADD,
-    ):
-        context: BuildLine = BuildLine._get_context(self, log=False)
-
-        if context is not None and isinstance(context, BuildLine):
-            context._add_to_context(*curve.edges(), mode=mode)
-
-        if isinstance(curve, Edge):
-            super().__init__(Wire([curve]).wrapped)
-        else:
-            super().__init__(curve.wrapped)
+    def __init__(self, curve: Wire, mode: Mode = Mode.ADD):
+        # Use the helper function to handle adding the curve to the context
+        _add_curve_to_context(curve, mode)
+        super().__init__(curve.wrapped)
 
 
-class Bezier(BaseLineObject):
+class BaseEdgeObject(Edge):
+    """BaseEdgeObject specialized for Edge.
+
+    Args:
+        curve (Edge): edge to create.
+        mode (Mode, optional): combination mode. Defaults to Mode.ADD.
+    """
+
+    _applies_to = [BuildLine._tag]
+
+    def __init__(self, curve: Edge, mode: Mode = Mode.ADD):
+        # Use the helper function to handle adding the curve to the context
+        _add_curve_to_context(curve, mode)
+        super().__init__(curve.wrapped)
+
+
+class Bezier(BaseEdgeObject):
     """Line Object: Bezier Curve
 
     Create a rational (with weights) or non-rational bezier curve.  The first and last
@@ -99,7 +119,7 @@ class Bezier(BaseLineObject):
         super().__init__(curve, mode=mode)
 
 
-class CenterArc(BaseLineObject):
+class CenterArc(BaseEdgeObject):
     """Line Object: Center Arc
 
     Add center arc to the line.
@@ -150,7 +170,7 @@ class CenterArc(BaseLineObject):
         super().__init__(arc, mode=mode)
 
 
-class DoubleTangentArc(BaseLineObject):
+class DoubleTangentArc(BaseEdgeObject):
     """Line Object: Double Tangent Arc
 
     Create an arc defined by a point/tangent pair and another line which the other end
@@ -249,7 +269,7 @@ class DoubleTangentArc(BaseLineObject):
         super().__init__(double.wire(), mode=mode)
 
 
-class EllipticalStartArc(BaseLineObject):
+class EllipticalStartArc(BaseEdgeObject):
     """Line Object: Elliptical Start Arc
 
     Makes an arc of an ellipse from the start point.
@@ -355,7 +375,7 @@ class EllipticalStartArc(BaseLineObject):
         # context: BuildLine = BuildLine._get_context(self)
 
 
-class EllipticalCenterArc(BaseLineObject):
+class EllipticalCenterArc(BaseEdgeObject):
     """Line Object: Elliptical Center Arc
 
     Makes an arc of an ellipse from a center point.
@@ -409,7 +429,7 @@ class EllipticalCenterArc(BaseLineObject):
         super().__init__(curve, mode=mode)
 
 
-class Helix(BaseLineObject):
+class Helix(BaseEdgeObject):
     """Line Object: Helix
 
     Add a helix to the line.
@@ -545,7 +565,7 @@ class FilletPolyline(BaseLineObject):
         super().__init__(new_wire, mode=mode)
 
 
-class JernArc(BaseLineObject):
+class JernArc(BaseEdgeObject):
     """JernArc
 
     Circular tangent arc with given radius and arc_size
@@ -605,7 +625,7 @@ class JernArc(BaseLineObject):
         super().__init__(arc, mode=mode)
 
 
-class Line(BaseLineObject):
+class Line(BaseEdgeObject):
     """Line Object: Line
 
     Add a straight line defined by two end points.
@@ -638,7 +658,7 @@ class Line(BaseLineObject):
         super().__init__(new_edge, mode=mode)
 
 
-class IntersectingLine(BaseLineObject):
+class IntersectingLine(BaseEdgeObject):
     """Intersecting Line Object: Line
 
     Add a straight line that intersects another line at a given parameter and angle.
@@ -679,7 +699,7 @@ class IntersectingLine(BaseLineObject):
         super().__init__(new_edge, mode=mode)
 
 
-class PolarLine(BaseLineObject):
+class PolarLine(BaseEdgeObject):
     """Line Object: Polar Line
 
     Add line defined by a start point, length and angle.
@@ -780,7 +800,7 @@ class Polyline(BaseLineObject):
         super().__init__(Wire.combine(new_edges)[0], mode=mode)
 
 
-class RadiusArc(BaseLineObject):
+class RadiusArc(BaseEdgeObject):
     """Line Object: Radius Arc
 
     Add an arc defined by two end points and a radius
@@ -832,7 +852,7 @@ class RadiusArc(BaseLineObject):
         super().__init__(arc, mode=mode)
 
 
-class SagittaArc(BaseLineObject):
+class SagittaArc(BaseEdgeObject):
     """Line Object: Sagitta Arc
 
     Add an arc defined by two points and the height of the arc (sagitta).
@@ -874,7 +894,7 @@ class SagittaArc(BaseLineObject):
         super().__init__(arc, mode=mode)
 
 
-class Spline(BaseLineObject):
+class Spline(BaseEdgeObject):
     """Line Object: Spline
 
     Add a spline through the provided points optionally constrained by tangents.
@@ -932,7 +952,7 @@ class Spline(BaseLineObject):
         super().__init__(spline, mode=mode)
 
 
-class TangentArc(BaseLineObject):
+class TangentArc(BaseEdgeObject):
     """Line Object: Tangent Arc
 
     Add an arc defined by two points and a tangent.
@@ -974,7 +994,7 @@ class TangentArc(BaseLineObject):
         super().__init__(arc, mode=mode)
 
 
-class ThreePointArc(BaseLineObject):
+class ThreePointArc(BaseEdgeObject):
     """Line Object: Three Point Arc
 
     Add an arc generated by three points.
