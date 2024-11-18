@@ -29,6 +29,8 @@ license:
 import unittest
 from math import atan2, degrees, pi, sqrt
 
+import pytest
+
 from build123d import *
 
 
@@ -507,6 +509,19 @@ class TestBuildSketchObjects(unittest.TestCase):
         self.assertLess(negative.area, positive.area)
         self.assertAlmostEqual(r1, r2, 2)
         self.assertTupleAlmostEquals(tuple(c1), tuple(c2), 2)
+
+
+@pytest.mark.parametrize(
+    "slot,args",
+    [
+        (SlotOverall, (5, 10)),
+        (SlotCenterToCenter, (-1, 10)),
+        (SlotCenterPoint, ((0, 0, 0), (2, 0, 0), 10)),
+    ],
+)
+def test_invalid_slots(slot, args):
+    with pytest.raises(ValueError):
+        slot(*args)
 
 
 if __name__ == "__main__":

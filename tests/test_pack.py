@@ -8,10 +8,8 @@ date: November 9th 2023
 desc: Unit tests for the build123d pack module
 """
 
-import operator
 import random
 import unittest
-from functools import reduce
 
 from build123d import *
 
@@ -53,15 +51,14 @@ class TestPack(unittest.TestCase):
         random.seed(123456)
         # 50 is an arbitrary number that is large enough to exercise
         # different aspects of the packer while still completing quickly.
-        inputs = [
-            SlotOverall(random.randint(1, 20), random.randint(1, 20)) for _ in range(50)
-        ]
+        widths = [random.randint(2, 20) for _ in range(50)]
+        heights = [random.randint(1, width - 1) for width in widths]
+        inputs = [SlotOverall(width, height) for width, height in zip(widths, heights)]
         # Not raising in this call shows successfull non-overlap.
         packed = pack(inputs, 1)
-        self.assertEqual(
-            "bbox: 0.0 <= x <= 124.0, 0.0 <= y <= 105.0, 0.0 <= z <= 0.0",
-            str((Sketch() + packed).bounding_box()),
-        )
+        bb = (Sketch() + packed).bounding_box()
+        self.assertEqual(bb.min, Vector(0, 0, 0))
+        self.assertEqual(bb.max, Vector(70, 63, 0))
 
 
 if __name__ == "__main__":

@@ -425,6 +425,13 @@ class SlotCenterPoint(BaseSketchObject):
         self.slot_height = height
 
         half_line = point_v - center_v
+
+        if half_line.length * 2 <= height:
+            raise ValueError(
+                f"Slots must have width > height. "
+                "Got: {height=} width={half_line.length * 2} (computed)"
+            )
+
         face = Face(
             Wire.combine(
                 [
@@ -458,6 +465,11 @@ class SlotCenterToCenter(BaseSketchObject):
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
+        if center_separation <= 0:
+            raise ValueError(
+                f"Requires center_separation > 0. Got: {center_separation=}"
+            )
+
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
@@ -499,6 +511,11 @@ class SlotOverall(BaseSketchObject):
         align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
+        if width <= height:
+            raise ValueError(
+                f"Slot requires that width > height. Got: {width=}, {height=}"
+            )
+
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
