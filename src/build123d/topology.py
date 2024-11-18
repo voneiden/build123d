@@ -1732,13 +1732,6 @@ class Shape(NodeMixin):
         else:
             sum_shape = self.fuse(*summands)
 
-        # Simplify Compounds if possible
-        sum_shape = (
-            sum_shape.unwrap(fully=True)
-            if isinstance(sum_shape, Compound)
-            else sum_shape
-        )
-
         if SkipClean.clean:
             sum_shape = sum_shape.clean()
 
@@ -1782,12 +1775,6 @@ class Shape(NodeMixin):
         # Do the actual cut operation
         difference = self.cut(*subtrahends)
 
-        # Simplify Compounds if possible
-        difference = (
-            difference.unwrap(fully=True)
-            if isinstance(difference, Compound)
-            else difference
-        )
         # To allow the @, % and ^ operators to work 1D objects must be type Curve
         if minuend_dim == 1:
             difference = Curve(Compound(difference.edges()).wrapped)
@@ -1804,13 +1791,6 @@ class Shape(NodeMixin):
 
         if new_shape.wrapped is not None and SkipClean.clean:
             new_shape = new_shape.clean()
-
-        # Simplify Compounds if possible
-        new_shape = (
-            new_shape.unwrap(fully=True)
-            if isinstance(new_shape, Compound)
-            else new_shape
-        )
 
         # To allow the @, % and ^ operators to work 1D objects must be type Curve
         if self._dim == 1:
@@ -2621,7 +2601,11 @@ class Shape(NodeMixin):
         operation.SetRunParallel(True)
         operation.Build()
 
-        result = Shape.cast(operation.Shape())
+        result = downcast(operation.Shape())
+        # Remove unnecessary TopoDS_Compound around single shape
+        if isinstance(result, TopoDS_Compound):
+            result = unwrap_topods_compound(result, True)
+        result = Shape.cast(result)
 
         base = args[0] if isinstance(args, tuple) else args
         base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
@@ -2829,7 +2813,12 @@ class Shape(NodeMixin):
         # Perform the splitting operation
         splitter.Build()
 
-        result = Compound(downcast(splitter.Shape())).unwrap(fully=False)
+        result = downcast(splitter.Shape())
+        # Remove unnecessary TopoDS_Compound around single shape
+        if isinstance(result, TopoDS_Compound):
+            result = unwrap_topods_compound(result, False)
+        result = Shape.cast(result)
+
         if keep != Keep.BOTH:
             if not isinstance(tool, Plane):
                 # Create solids from the surfaces for sorting
@@ -2843,7 +2832,8 @@ class Shape(NodeMixin):
                 (tops if is_up else bottoms).append(part)
             result = Compound(tops) if keep == Keep.TOP else Compound(bottoms)
 
-        return result.unwrap(fully=True)
+        result_wrapped = unwrap_topods_compound(result.wrapped, fully=True)
+        return Shape.cast(result_wrapped)
 
     @overload
     def split_by_perimeter(
@@ -4415,7 +4405,9 @@ class Compound(Mixin3D, Shape):
 
         # Align the text from the bounding box
         align = tuplify(align, 2)
-        text_flat = text_flat.translate(text_flat.bounding_box().to_align_offset(align))
+        text_flat = text_flat.translate(
+            Vector(*text_flat.bounding_box().to_align_offset(align))
+        )
 
         if text_path is not None:
             path_length = text_path.length
@@ -8464,7 +8456,10 @@ class Wire(Mixin1D, Shape):
         wire_builder.Build()
         if not wire_builder.IsDone():
             if wire_builder.Error() == BRepBuilderAPI_NonManifoldWire:
-                warnings.warn("Wire is non manifold", stacklevel=2)
+                warnings.warn(
+                    "Wire is non manifold (e.g. branching, self intersecting)",
+                    stacklevel=2,
+                )
             elif wire_builder.Error() == BRepBuilderAPI_EmptyWire:
                 raise RuntimeError("Wire is empty")
             elif wire_builder.Error() == BRepBuilderAPI_DisconnectedWire:
@@ -9230,6 +9225,34 @@ def topo_explore_common_vertex(
         vert_exp.Next()
 
     return None  # No common vertex found
+
+
+def unwrap_topods_compound(
+    compound: TopoDS_Compound, fully: bool = True
+) -> Union[TopoDS_Compound, TopoDS_Shape]:
+    """Strip unnecessary Compound wrappers
+
+    Args:
+        compound (TopoDS_Compound): The TopoDS_Compound to unwrap.
+        fully (bool, optional): return base shape without any TopoDS_Compound
+            wrappers (otherwise one TopoDS_Compound is left). Defaults to True.
+
+    Returns:
+        Union[TopoDS_Compound, TopoDS_Shape]: base shape
+    """
+
+    if compound.NbChildren() == 1:
+        iterator = TopoDS_Iterator(compound)
+        single_element = downcast(iterator.Value())
+
+        # If the single element is another TopoDS_Compound, unwrap it recursively
+        if isinstance(single_element, TopoDS_Compound):
+            return unwrap_topods_compound(single_element, fully)
+
+        return single_element if fully else compound
+
+    # If there are no elements or more than one element, return TopoDS_Compound
+    return compound
 
 
 class SkipClean:

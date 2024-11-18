@@ -90,6 +90,7 @@ from build123d.topology import (
     polar,
     new_edges,
     delta,
+    unwrap_topods_compound,
 )
 from build123d.jupyter_tools import display
 
@@ -1577,6 +1578,28 @@ class TestFunctions(unittest.TestCase):
         with self.assertRaises(TypeError):
             Vector(1, 1, 1) & ("x", "y", "z")
 
+    def test_unwrap_topods_compound(self):
+        # Complex Compound
+        b1 = Box(1, 1, 1).solid()
+        b2 = Box(2, 2, 2).solid()
+        c1 = Compound([b1, b2])
+        c2 = Compound([b1, c1])
+        c3 = Compound([c2])
+        c4 = Compound([c3])
+        self.assertEqual(c4.wrapped.NbChildren(), 1)
+        c5 = Compound(unwrap_topods_compound(c4.wrapped, False))
+        self.assertEqual(c5.wrapped.NbChildren(), 2)
+
+        # unwrap fully
+        c0 = Compound([b1])
+        c1 = Compound([c0])
+        result = Shape.cast(unwrap_topods_compound(c1.wrapped, True))
+        self.assertTrue(isinstance(result, Solid))
+
+        # unwrap not fully
+        result = Shape.cast(unwrap_topods_compound(c1.wrapped, False))
+        self.assertTrue(isinstance(result, Compound))
+
 
 class TestImportExport(DirectApiTestCase):
     def test_import_export(self):
@@ -2579,7 +2602,7 @@ class TestPlane(DirectApiTestCase):
             (
                 Axis.X.direction,  # plane x_dir
                 Axis.Z.direction,  # plane y_dir
-                 -Axis.Y.direction,  # plane z_dir
+                -Axis.Y.direction,  # plane z_dir
             ),
             # Trapezoid face, positive y coordinate
             (
