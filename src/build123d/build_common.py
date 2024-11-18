@@ -54,7 +54,14 @@ from typing import Any, Callable, Iterable, Optional, Union, TypeVar
 from typing_extensions import Self, ParamSpec, Concatenate
 
 from build123d.build_enums import Align, Mode, Select, Unit
-from build123d.geometry import Axis, Location, Plane, Vector, VectorLike
+from build123d.geometry import (
+    Axis,
+    Location,
+    Plane,
+    Vector,
+    VectorLike,
+    to_align_offset,
+)
 from build123d.topology import (
     Compound,
     Curve,
@@ -963,14 +970,7 @@ class HexLocations(LocationList):
         min_corner = Vector(sorted_points[0][0].X, sorted_points[1][0].Y)
 
         # Calculate the amount to offset the array to align it
-        align_offset = []
-        for i in range(2):
-            if self.align[i] == Align.MIN:
-                align_offset.append(0)
-            elif self.align[i] == Align.CENTER:
-                align_offset.append(-size[i] / 2)
-            elif self.align[i] == Align.MAX:
-                align_offset.append(-size[i])
+        align_offset = to_align_offset((0, 0), size, align)
 
         # Align the points
         points = ShapeList(
@@ -1163,29 +1163,22 @@ class GridLocations(LocationList):
         size = [x_spacing * (x_count - 1), y_spacing * (y_count - 1)]
         self.size = Vector(*size)  #: size of the grid
 
-        align_offset = []
-        for i in range(2):
-            if self.align[i] == Align.MIN:
-                align_offset.append(0.0)
-            elif self.align[i] == Align.CENTER:
-                align_offset.append(-size[i] / 2)
-            elif self.align[i] == Align.MAX:
-                align_offset.append(-size[i])
+        align_offset = to_align_offset((0, 0), size, align)
 
-        self.min = Vector(*align_offset)  #: bottom left corner
+        self.min = align_offset  #: bottom left corner
         self.max = self.min + self.size  #: top right corner
 
         # Create the list of local locations
-        local_locations = []
-        for i, j in product(range(x_count), range(y_count)):
-            local_locations.append(
-                Location(
-                    Vector(
-                        i * x_spacing + align_offset[0],
-                        j * y_spacing + align_offset[1],
-                    )
+        local_locations = [
+            Location(
+                align_offset
+                + Vector(
+                    i * x_spacing,
+                    j * y_spacing,
                 )
             )
+            for i, j in product(range(x_count), range(y_count))
+        ]
 
         self.local_locations = Locations._move_to_existing(
             local_locations

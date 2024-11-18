@@ -27,7 +27,11 @@ license:
 """
 
 from __future__ import annotations
+
 from enum import Enum, auto
+from typing import Union
+
+from typing_extensions import TypeAlias
 
 
 class Align(Enum):
@@ -36,9 +40,21 @@ class Align(Enum):
     MIN = auto()
     CENTER = auto()
     MAX = auto()
+    NONE = None
 
     def __repr__(self):
         return f"<{self.__class__.__name__}.{self.name}>"
+
+
+Align2DType: TypeAlias = Union[
+    Union[Align, None],
+    tuple[Union[Align, None], Union[Align, None]],
+]
+
+Align3DType: TypeAlias = Union[
+    Union[Align, None],
+    tuple[Union[Align, None], Union[Align, None], Union[Align, None]],
+]
 
 
 class ApproxOption(Enum):

@@ -63,17 +63,8 @@ class BasePartObject(Part):
         if align is not None:
             align = tuplify(align, 3)
             bbox = part.bounding_box()
-            align_offset = []
-            for i in range(3):
-                if align[i] == Align.MIN:
-                    align_offset.append(-bbox.min.to_tuple()[i])
-                elif align[i] == Align.CENTER:
-                    align_offset.append(
-                        -(bbox.min.to_tuple()[i] + bbox.max.to_tuple()[i]) / 2
-                    )
-                elif align[i] == Align.MAX:
-                    align_offset.append(-bbox.max.to_tuple()[i])
-            part.move(Location(Vector(*align_offset)))
+            offset = bbox.to_align_offset(align)
+            part.move(Location(offset))
 
         context: BuildPart = BuildPart._get_context(self, log=False)
         rotate = Rotation(*rotation) if isinstance(rotation, tuple) else rotation

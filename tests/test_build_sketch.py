@@ -27,7 +27,8 @@ license:
 """
 
 import unittest
-from math import pi, sqrt, atan2, degrees
+from math import atan2, degrees, pi, sqrt
+
 from build123d import *
 
 

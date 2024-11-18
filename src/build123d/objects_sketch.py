@@ -36,7 +36,14 @@ from typing import Iterable, Union
 from build123d.build_common import LocationList, flatten_sequence, validate_inputs
 from build123d.build_enums import Align, FontStyle, Mode
 from build123d.build_sketch import BuildSketch
-from build123d.geometry import Axis, Location, Rotation, Vector, VectorLike
+from build123d.geometry import (
+    Axis,
+    Location,
+    Rotation,
+    Vector,
+    VectorLike,
+    to_align_offset,
+)
 from build123d.topology import (
     Compound,
     Edge,
@@ -74,7 +81,7 @@ class BaseSketchObject(Sketch):
     ):
         if align is not None:
             align = tuplify(align, 2)
-            obj.move(Location(Vector(*obj.bounding_box().to_align_offset(align))))
+            obj.move(Location(obj.bounding_box().to_align_offset(align)))
 
         context: BuildSketch = BuildSketch._get_context(self, log=False)
         if context is None:
@@ -344,19 +351,8 @@ class RegularPolygon(BaseSketchObject):
         mins = [pts_sorted[0][0].X, pts_sorted[1][0].Y]
         maxs = [pts_sorted[0][-1].X, pts_sorted[1][-1].Y]
 
-        if align is not None:
-            align = tuplify(align, 2)
-            align_offset = []
-            for i in range(2):
-                if align[i] == Align.MIN:
-                    align_offset.append(-mins[i])
-                elif align[i] == Align.CENTER:
-                    align_offset.append(0)
-                elif align[i] == Align.MAX:
-                    align_offset.append(-maxs[i])
-        else:
-            align_offset = [0, 0]
-        pts = [point + Vector(*align_offset) for point in pts]
+        align_offset = to_align_offset(mins, maxs, align, center=(0, 0))
+        pts = [point + align_offset for point in pts]
 
         face = Face(Wire.make_polygon(pts))
         super().__init__(face, rotation=0, align=None, mode=mode)
