@@ -878,12 +878,15 @@ class TestCompound(DirectApiTestCase):
         comp4 = comp3.unwrap(fully=True)
         self.assertTrue(isinstance(comp4, Face))
 
-    def test_first_level_shapes(self):
+    def test_get_top_level_shapes(self):
         base_shapes = Compound(children=PolarLocations(15, 20) * Box(4, 4, 4))
-        fls = base_shapes.first_level_shapes()
+        fls = base_shapes.get_top_level_shapes()
         self.assertTrue(isinstance(fls, ShapeList))
         self.assertEqual(len(fls), 20)
         self.assertTrue(all(isinstance(s, Solid) for s in fls))
+
+        b1 = Box(1, 1, 1).solid()
+        self.assertEqual(b1.get_top_level_shapes()[0], b1)
 
 
 class TestEdge(DirectApiTestCase):
@@ -3615,10 +3618,12 @@ class TestShapeList(DirectApiTestCase):
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
         with self.assertWarns(UserWarning):
             sl.vertex()
+        self.assertEqual(len(Edge().vertices()), 0)
 
     def test_edges(self):
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
         self.assertEqual(len(sl.edges()), 8)
+        self.assertEqual(len(Edge().edges()), 0)
 
     def test_edge(self):
         sl = ShapeList([Edge.make_circle(1)])
@@ -3630,6 +3635,7 @@ class TestShapeList(DirectApiTestCase):
     def test_wires(self):
         sl = ShapeList([Face.make_rect(1, 1), Face.make_rect(1, 1, Plane((4, 4)))])
         self.assertEqual(len(sl.wires()), 2)
+        self.assertEqual(len(Wire().wires()), 0)
 
     def test_wire(self):
         sl = ShapeList([Wire.make_circle(1)])
@@ -3641,6 +3647,7 @@ class TestShapeList(DirectApiTestCase):
     def test_faces(self):
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
         self.assertEqual(len(sl.faces()), 9)
+        self.assertEqual(len(Face().faces()), 0)
 
     def test_face(self):
         sl = ShapeList(
@@ -3654,6 +3661,7 @@ class TestShapeList(DirectApiTestCase):
     def test_shells(self):
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
         self.assertEqual(len(sl.shells()), 2)
+        self.assertEqual(len(Shell().shells()), 0)
 
     def test_shell(self):
         sl = ShapeList([Vertex(1, 1, 1), Solid.make_box(1, 1, 1)])
@@ -3665,6 +3673,7 @@ class TestShapeList(DirectApiTestCase):
     def test_solids(self):
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
         self.assertEqual(len(sl.solids()), 2)
+        self.assertEqual(len(Solid().solids()), 0)
 
     def test_solid(self):
         sl = ShapeList([Solid.make_box(1, 1, 1), Solid.make_cylinder(1, 1)])
@@ -3676,6 +3685,7 @@ class TestShapeList(DirectApiTestCase):
     def test_compounds(self):
         sl = ShapeList([Box(1, 1, 1), Cylinder(1, 1)])
         self.assertEqual(len(sl.compounds()), 2)
+        self.assertEqual(len(Compound().compounds()), 0)
 
     def test_compound(self):
         sl = ShapeList([Box(1, 1, 1), Cylinder(1, 1)])

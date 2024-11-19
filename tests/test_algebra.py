@@ -339,6 +339,31 @@ class ObjectTests(unittest.TestCase):
 
 
 class AlgebraTests(unittest.TestCase):
+
+    # Shapes
+
+    def test_shape_plus(self):
+        f1 = Face.make_rect(1, 3)
+        f2 = Face.make_rect(3, 1)
+        f3 = f1 + f2
+        self.assertTupleAlmostEquals(f3.bounding_box().size, (3, 3, 0), 6)
+
+        f4 = f1 + []
+        self.assertTupleAlmostEquals(f4.bounding_box().size, (1, 3, 0), 6)
+
+        e1 = Edge.make_line((0, 0), (1, 1))
+        with self.assertRaises(ValueError):
+            _ = f1 + e1
+
+        with self.assertRaises(ValueError):
+            _ = Shape() + f2
+
+        f5 = Face() + f1
+        self.assertTupleAlmostEquals(f5.bounding_box().size, (1, 3, 0), 6)
+
+        f6 = Face() + [f1, f2]
+        self.assertTupleAlmostEquals(f6.bounding_box().size, (3, 3, 0), 6)
+
     # Part
 
     def test_part_plus(self):
@@ -507,15 +532,46 @@ class AlgebraTests(unittest.TestCase):
         self.assertTupleAlmostEquals(result.bounding_box().max, (0.4, 0.4, 0.0), 3)
 
     # Curve
-    def test_curve_plus(self):
+    def test_curve_plus_continuous(self):
         l1 = Polyline((0, 0), (1, 0), (1, 1))
         l2 = Line((1, 1), (0, 0))
         l = l1 + l2
-        w = Wire(l)
-        self.assertTrue(w.is_closed)
+        self.assertTrue(isinstance(l, Wire))
+        self.assertTrue(l.is_closed)
         self.assertTupleAlmostEquals(
-            w.center(CenterOf.MASS), (0.6464466094067263, 0.35355339059327373, 0.0), 6
+            l.center(CenterOf.MASS), (0.6464466094067263, 0.35355339059327373, 0.0), 6
         )
+
+    def test_curve_plus_noncontinuous(self):
+        e1 = Edge.make_line((0, 1), (1, 1))
+        e2 = Edge.make_line((1, 1), (2, 1))
+        e3 = Edge.make_line((2, 1), (3, 1))
+        l = Curve() + [e1, e3]
+        self.assertTrue(isinstance(l, Compound))
+        l += e2  # fills the hole and makes a single edge
+        self.assertTrue(isinstance(l, Edge))
+        self.assertAlmostEqual(l.length, 3, 5)
+
+        l2 = e1 + e3
+        self.assertTrue(isinstance(l2, Compound))
+
+    def test_curve_plus_nothing(self):
+        e1 = Edge.make_line((0, 1), (1, 1))
+        l = e1 + Curve()
+        self.assertTrue(isinstance(l, Edge))
+        self.assertAlmostEqual(l.length, 1, 5)
+
+    def test_nothing_plus_curve(self):
+        e1 = Edge.make_line((0, 1), (1, 1))
+        l = Curve() + e1
+        self.assertTrue(isinstance(l, Edge))
+        self.assertAlmostEqual(l.length, 1, 5)
+
+    def test_bad_dims(self):
+        e1 = Edge.make_line((0, 1), (1, 1))
+        f1 = Face.make_rect(1, 1)
+        with self.assertRaises(ValueError):
+            _ = e1 + f1
 
     def test_curve_minus(self):
         l1 = Line((0, 0), (1, 1))

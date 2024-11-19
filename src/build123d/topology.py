@@ -382,6 +382,46 @@ def tuplify(obj: Any, dim: int) -> tuple:
 class Mixin1D:
     """Methods to add to the Edge and Wire classes"""
 
+    def __add__(self, other: Union[list[Shape], Shape]) -> Self:
+        """fuse shape to wire/edge operator +"""
+
+        # Convert `other` to list of base objects and filter out None values
+        summands = [
+            shape
+            for o in (other if isinstance(other, (list, tuple)) else [other])
+            if o is not None
+            for shape in o.get_top_level_shapes()
+        ]
+        # If there is nothing to add return the original object
+        if not summands:
+            return self
+
+        if not all(summand._dim == 1 for summand in summands):
+            raise ValueError("Only shapes with the same dimension can be added")
+
+        summand_edges = [e for summand in summands for e in summand.edges()]
+        if self.wrapped is None:  # an empty object
+            if len(summands) == 1:
+                sum_shape = summands[0]
+            else:
+                try:
+                    sum_shape = Wire(summand_edges)
+                except Exception:
+                    sum_shape = summands[0].fuse(*summands[1:])
+        else:
+            try:
+                sum_shape = Wire(self.edges() + summand_edges)
+            except Exception:
+                sum_shape = self.fuse(*summands)
+
+        if SkipClean.clean:
+            sum_shape = sum_shape.clean()
+
+        # If there is only one Edge, return that
+        sum_shape = sum_shape.edge() if len(sum_shape.edges()) == 1 else sum_shape
+
+        return sum_shape
+
     def start_point(self) -> Vector:
         """The start point of this edge
 
@@ -1710,7 +1750,7 @@ class Shape(NodeMixin):
             shape
             for o in (other if isinstance(other, (list, tuple)) else [other])
             if o is not None
-            for shape in (o.first_level_shapes() if isinstance(o, Compound) else [o])
+            for shape in o.get_top_level_shapes()
         ]
         # If there is nothing to add return the original object
         if not summands:
@@ -1735,10 +1775,6 @@ class Shape(NodeMixin):
         if SkipClean.clean:
             sum_shape = sum_shape.clean()
 
-        # To allow the @, % and ^ operators to work 1D objects must be type Curve
-        if addend_dim == 1:
-            sum_shape = Curve(Compound(sum_shape.edges()).wrapped)
-
         return sum_shape
 
     def __sub__(self, other: Union[Shape, Iterable[Shape]]) -> Self:
@@ -1752,7 +1788,7 @@ class Shape(NodeMixin):
             shape
             for o in (other if isinstance(other, (list, tuple)) else [other])
             if o is not None
-            for shape in (o.first_level_shapes() if isinstance(o, Compound) else [o])
+            for shape in o.get_top_level_shapes()
         ]
         # If there is nothing to subtract return the original object
         if not subtrahends:
@@ -1775,10 +1811,6 @@ class Shape(NodeMixin):
         # Do the actual cut operation
         difference = self.cut(*subtrahends)
 
-        # To allow the @, % and ^ operators to work 1D objects must be type Curve
-        if minuend_dim == 1:
-            difference = Curve(Compound(difference.edges()).wrapped)
-
         return difference
 
     def __and__(self, other: Shape) -> Self:
@@ -1791,10 +1823,6 @@ class Shape(NodeMixin):
 
         if new_shape.wrapped is not None and SkipClean.clean:
             new_shape = new_shape.clean()
-
-        # To allow the @, % and ^ operators to work 1D objects must be type Curve
-        if self._dim == 1:
-            new_shape = Curve(Compound(new_shape.edges()).wrapped)
 
         return new_shape
 
@@ -1828,10 +1856,7 @@ class Shape(NodeMixin):
             upgrader.Build()
             self.wrapped = downcast(upgrader.Shape())
         except Exception:
-            warnings.warn(
-                f"Unable to clean {self}",
-                stacklevel=2,
-            )
+            warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
 
     def fix(self) -> Self:
@@ -2175,8 +2200,53 @@ class Shape(NodeMixin):
 
         return out
 
+    def get_top_level_shapes(self) -> ShapeList[Shape]:
+        """
+        Retrieve the first level of child shapes from the shape.
+
+        This method collects all the non-compound shapes directly contained in the
+        current shape. If the wrapped shape is a `TopoDS_Compound`, it traverses
+        its immediate children and collects all shapes that are not further nested
+        compounds. Nested compounds are traversed to gather their non-compound elements
+        without returning the nested compound itself.
+
+        Returns:
+            ShapeList[Shape]: A list of all first-level non-compound child shapes.
+
+        Example:
+            If the current shape is a compound containing both simple shapes
+            (e.g., edges, vertices) and other compounds, the method returns a list
+            of only the simple shapes directly contained at the top level.
+        """
+        if self.wrapped is None:
+            return ShapeList()
+
+        first_level_shapes = []
+        stack = [self]
+
+        while stack:
+            current_shape = stack.pop()
+            if isinstance(current_shape.wrapped, TopoDS_Compound):
+                iterator = TopoDS_Iterator()
+                iterator.Initialize(current_shape.wrapped)
+                while iterator.More():
+                    child_shape = Shape.cast(iterator.Value())
+                    if isinstance(child_shape.wrapped, TopoDS_Compound):
+                        # Traverse further into the compound
+                        stack.append(child_shape)
+                    else:
+                        # Add non-compound shape
+                        first_level_shapes.append(child_shape)
+                    iterator.Next()
+            else:
+                first_level_shapes.append(current_shape)
+
+        return ShapeList(first_level_shapes)
+
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
+        if self.wrapped is None:
+            return ShapeList()
         vertex_list = ShapeList(
             [Vertex(downcast(i)) for i in self._entities(Vertex.__name__)]
         )
@@ -2190,13 +2260,14 @@ class Shape(NodeMixin):
         vertex_count = len(vertices)
         if vertex_count != 1:
             warnings.warn(
-                f"Found {vertex_count} vertices, returning first",
-                stacklevel=2,
+                f"Found {vertex_count} vertices, returning first", stacklevel=2
             )
         return vertices[0]
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
+        if self.wrapped is None:
+            return ShapeList()
         edge_list = ShapeList(
             [
                 Edge(i)
@@ -2221,6 +2292,8 @@ class Shape(NodeMixin):
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
+        if self.wrapped is None:
+            return ShapeList()
         if isinstance(self, Compound):
             # pylint: disable=not-an-iterable
             sub_compounds = [c for c in self if isinstance(c, Compound)]
@@ -2242,6 +2315,8 @@ class Shape(NodeMixin):
 
     def wires(self) -> ShapeList[Wire]:
         """wires - all the wires in this Shape"""
+        if self.wrapped is None:
+            return ShapeList()
         return ShapeList([Wire(i) for i in self._entities(Wire.__name__)])
 
     def wire(self) -> Wire:
@@ -2257,6 +2332,8 @@ class Shape(NodeMixin):
 
     def faces(self) -> ShapeList[Face]:
         """faces - all the faces in this Shape"""
+        if self.wrapped is None:
+            return ShapeList()
         face_list = ShapeList([Face(i) for i in self._entities(Face.__name__)])
         for face in face_list:
             face.topo_parent = self
@@ -2273,6 +2350,8 @@ class Shape(NodeMixin):
 
     def shells(self) -> ShapeList[Shell]:
         """shells - all the shells in this Shape"""
+        if self.wrapped is None:
+            return ShapeList()
         return ShapeList([Shell(i) for i in self._entities(Shell.__name__)])
 
     def shell(self) -> Shell:
@@ -2288,6 +2367,8 @@ class Shape(NodeMixin):
 
     def solids(self) -> ShapeList[Solid]:
         """solids - all the solids in this Shape"""
+        if self.wrapped is None:
+            return ShapeList()
         return ShapeList([Solid(i) for i in self._entities(Solid.__name__)])
 
     def solid(self) -> Solid:
@@ -2607,7 +2688,7 @@ class Shape(NodeMixin):
             result = unwrap_topods_compound(result, True)
         result = Shape.cast(result)
 
-        base = args[0] if isinstance(args, tuple) else args
+        base = args[0] if isinstance(args, (list, tuple)) else args
         base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
 
         return result
@@ -4015,7 +4096,7 @@ class Compound(Mixin3D, Shape):
     @property
     def _dim(self) -> Union[int, None]:
         """The dimension of the shapes within the Compound - None if inconsistent"""
-        sub_dims = {s._dim for s in self.first_level_shapes()}
+        sub_dims = {s._dim for s in self.get_top_level_shapes()}
         return sub_dims.pop() if len(sub_dims) == 1 else None
 
     @overload
@@ -4251,6 +4332,47 @@ class Compound(Mixin3D, Shape):
             self.wrapped = Compound._make_compound([c.wrapped for c in self.children])
         # else:
         #     logger.debug("Adding no children to %s", self.label)
+
+    def __add__(self, other: Union[list[Shape], Shape]) -> Shape:
+        """Combine other to self `+` operator
+
+        Note that if all of the objects are connected Edges/Wires the result
+        will be a Wire, otherwise a Shape.
+        """
+        if self._dim == 1:
+            curve = Curve() if self.wrapped is None else Curve(self.wrapped)
+            self.copy_attributes_to(curve, ["wrapped", "_NodeMixin__children"])
+            return curve + other
+        else:
+            summands = [
+                shape
+                for o in (other if isinstance(other, (list, tuple)) else [other])
+                if o is not None
+                for shape in o.get_top_level_shapes()
+            ]
+            # If there is nothing to add return the original object
+            if not summands:
+                return self
+
+            summands = [
+                s for s in self.get_top_level_shapes() + summands if s is not None
+            ]
+
+            # Only fuse the parts if necessary
+            if len(summands) <= 1:
+                result: Shape = summands[0]
+            else:
+                fuse_op = BRepAlgoAPI_Fuse()
+                fuse_op.SetFuzzyValue(TOLERANCE)
+                self.copy_attributes_to(
+                    summands[0], ["wrapped", "_NodeMixin__children"]
+                )
+                result = self._bool_op(summands[:1], summands[1:], fuse_op)
+
+            if SkipClean.clean:
+                result = result.clean()
+
+            return result
 
     def do_children_intersect(
         self, include_parent: bool = False, tolerance: float = 1e-5
@@ -4490,64 +4612,6 @@ class Compound(Mixin3D, Shape):
 
         return TopoDS_Iterator(self.wrapped).More()
 
-    def cut(self, *to_cut: Shape) -> Compound:
-        """Remove a shape from another one
-
-        Args:
-          *to_cut: Shape:
-
-        Returns:
-
-        """
-
-        cut_op = BRepAlgoAPI_Cut()
-
-        return tcast(Compound, self._bool_op(self, to_cut, cut_op))
-
-    def fuse(self, *to_fuse: Shape, glue: bool = False, tol: float = None) -> Compound:
-        """Fuse shapes together
-
-        Args:
-          *to_fuse: Shape:
-          glue: bool:  (Default value = False)
-          tol: float:  (Default value = None)
-
-        Returns:
-
-        """
-
-        fuse_op = BRepAlgoAPI_Fuse()
-        if glue:
-            fuse_op.SetGlue(BOPAlgo_GlueEnum.BOPAlgo_GlueShift)
-        if tol:
-            fuse_op.SetFuzzyValue(tol)
-
-        args = tuple(self) + to_fuse
-
-        if len(args) <= 1:
-            return_value: Shape = args[0]
-        else:
-            return_value = self._bool_op(args[:1], args[1:], fuse_op)
-
-        # fuse_op.RefineEdges()
-        # fuse_op.FuseEdges()
-
-        return tcast(Compound, return_value)
-
-    def intersect(self, *to_intersect: Shape) -> Compound:
-        """Construct shape intersection
-
-        Args:
-          *to_intersect: Shape:
-
-        Returns:
-
-        """
-
-        intersect_op = BRepAlgoAPI_Common()
-
-        return tcast(Compound, self._bool_op(self, to_intersect, intersect_op))
-
     def get_type(
         self,
         obj_type: Union[
@@ -4586,36 +4650,6 @@ class Compound(Mixin3D, Shape):
                 iterator.Next()
 
         return results
-
-    def first_level_shapes(
-        self, _shapes: list[TopoDS_Shape] = None
-    ) -> ShapeList[Shape]:
-        """first_level_shapes
-
-        This method iterates through the immediate children of the compound and
-        collects all non-compound shapes (e.g., vertices, edges, faces, solids).
-        If a child shape is itself a compound, the method recursively explores it,
-        retrieving all first-level shapes within any nested compounds.
-
-        Note: the _shapes parameter is not to be assigned by the user.
-
-        Returns:
-            ShapeList[Shape]: Shapes contained within the Compound
-        """
-        if self.wrapped is None:
-            return ShapeList()
-        if _shapes is None:
-            _shapes = []
-        iterator = TopoDS_Iterator()
-        iterator.Initialize(self.wrapped)
-        while iterator.More():
-            child = Shape.cast(iterator.Value())
-            if isinstance(child, Compound):
-                child.first_level_shapes(_shapes)
-            else:
-                _shapes.append(child)
-            iterator.Next()
-        return ShapeList(_shapes)
 
     def unwrap(self, fully: bool = True) -> Union[Self, Shape]:
         """Strip unnecessary Compound wrappers
@@ -4674,6 +4708,8 @@ class Curve(Compound):
     @property
     def _dim(self) -> int:
         return 1
+
+    __add__ = Mixin1D.__add__
 
     def __matmul__(self, position: float) -> Vector:
         """Position on curve operator @ - only works if continuous"""
@@ -9240,7 +9276,6 @@ def unwrap_topods_compound(
     Returns:
         Union[TopoDS_Compound, TopoDS_Shape]: base shape
     """
-
     if compound.NbChildren() == 1:
         iterator = TopoDS_Iterator(compound)
         single_element = downcast(iterator.Value())
