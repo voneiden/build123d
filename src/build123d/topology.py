@@ -2243,60 +2243,87 @@ class Shape(NodeMixin):
 
         return ShapeList(first_level_shapes)
 
+    @staticmethod
+    def _get_shape_list(shape: Shape, entity_type: str) -> ShapeList:
+        """Helper to extract entities of a specific type from a shape."""
+        if shape.wrapped is None:
+            return ShapeList()
+        shape_list = ShapeList([Shape.cast(i) for i in shape._entities(entity_type)])
+        for item in shape_list:
+            item.topo_parent = shape
+        return shape_list
+
+    @staticmethod
+    def _get_single_shape(shape: Shape, entity_type: str) -> Shape:
+        """Helper to extract a single entity of a specific type from a shape,
+        with a warning if count != 1."""
+        shape_list = Shape._get_shape_list(shape, entity_type)
+        entity_count = len(shape_list)
+        if entity_count != 1:
+            warnings.warn(
+                f"Found {entity_count} {entity_type.lower()}s, returning first",
+                stacklevel=2,
+            )
+        return shape_list[0] if shape_list else None
+
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
-        if self.wrapped is None:
-            return ShapeList()
-        vertex_list = ShapeList(
-            [Vertex(downcast(i)) for i in self._entities(Vertex.__name__)]
-        )
-        for vertex in vertex_list:
-            vertex.topo_parent = self
-        return vertex_list
+        return Shape._get_shape_list(self, "Vertex")
 
     def vertex(self) -> Vertex:
         """Return the Vertex"""
-        vertices = self.vertices()
-        vertex_count = len(vertices)
-        if vertex_count != 1:
-            warnings.warn(
-                f"Found {vertex_count} vertices, returning first", stacklevel=2
-            )
-        return vertices[0]
+        return Shape._get_single_shape(self, "Vertex")
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
-        if self.wrapped is None:
-            return ShapeList()
-        edge_list = ShapeList(
-            [
-                Edge(i)
-                for i in self._entities(Edge.__name__)
-                if not BRep_Tool.Degenerated_s(TopoDS.Edge_s(i))
-            ]
+        edge_list = Shape._get_shape_list(self, "Edge")
+        return edge_list.filter_by(
+            lambda e: BRep_Tool.Degenerated_s(e.wrapped), reverse=True
         )
-        for edge in edge_list:
-            edge.topo_parent = self
-        return edge_list
 
     def edge(self) -> Edge:
         """Return the Edge"""
-        edges = self.edges()
-        edge_count = len(edges)
-        if edge_count != 1:
-            warnings.warn(
-                f"Found {edge_count} edges, returning first",
-                stacklevel=2,
-            )
-        return edges[0]
+        return Shape._get_single_shape(self, "Edge")
+
+    def wires(self) -> ShapeList[Wire]:
+        """wires - all the wires in this Shape"""
+        return Shape._get_shape_list(self, "Wire")
+
+    def wire(self) -> Wire:
+        """Return the Wire"""
+        return Shape._get_single_shape(self, "Wire")
+
+    def faces(self) -> ShapeList[Face]:
+        """faces - all the faces in this Shape"""
+        return Shape._get_shape_list(self, "Face")
+
+    def face(self) -> Face:
+        """Return the Face"""
+        return Shape._get_single_shape(self, "Face")
+
+    def shells(self) -> ShapeList[Shell]:
+        """shells - all the shells in this Shape"""
+        return Shape._get_shape_list(self, "Shell")
+
+    def shell(self) -> Shell:
+        """Return the Shell"""
+        return Shape._get_single_shape(self, "Shell")
+
+    def solids(self) -> ShapeList[Solid]:
+        """solids - all the solids in this Shape"""
+        return Shape._get_shape_list(self, "Solid")
+
+    def solid(self) -> Solid:
+        """Return the Solid"""
+        return Shape._get_single_shape(self, "Solid")
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this Shape"""
         if self.wrapped is None:
             return ShapeList()
-        if isinstance(self, Compound):
+        if isinstance(self.wrapped, TopoDS_Compound):
             # pylint: disable=not-an-iterable
-            sub_compounds = [c for c in self if isinstance(c, Compound)]
+            sub_compounds = [c for c in self if isinstance(c.wrapped, TopoDS_Compound)]
             sub_compounds.append(self)
         else:
             sub_compounds = []
@@ -2304,83 +2331,14 @@ class Shape(NodeMixin):
 
     def compound(self) -> Compound:
         """Return the Compound"""
-        compounds = self.compounds()
-        compound_count = len(compounds)
-        if compound_count != 1:
+        shape_list = self.compounds()
+        entity_count = len(shape_list)
+        if entity_count != 1:
             warnings.warn(
-                f"Found {compound_count} compounds, returning first",
+                f"Found {entity_count} compounds, returning first",
                 stacklevel=2,
             )
-        return compounds[0]
-
-    def wires(self) -> ShapeList[Wire]:
-        """wires - all the wires in this Shape"""
-        if self.wrapped is None:
-            return ShapeList()
-        return ShapeList([Wire(i) for i in self._entities(Wire.__name__)])
-
-    def wire(self) -> Wire:
-        """Return the Wire"""
-        wires = self.wires()
-        wire_count = len(wires)
-        if wire_count != 1:
-            warnings.warn(
-                f"Found {wire_count} wires, returning first",
-                stacklevel=2,
-            )
-        return wires[0]
-
-    def faces(self) -> ShapeList[Face]:
-        """faces - all the faces in this Shape"""
-        if self.wrapped is None:
-            return ShapeList()
-        face_list = ShapeList([Face(i) for i in self._entities(Face.__name__)])
-        for face in face_list:
-            face.topo_parent = self
-        return face_list
-
-    def face(self) -> Face:
-        """Return the Face"""
-        faces = self.faces()
-        face_count = len(faces)
-        if face_count != 1:
-            msg = f"Found {face_count} faces, returning first"
-            warnings.warn(msg, stacklevel=2)
-        return faces[0]
-
-    def shells(self) -> ShapeList[Shell]:
-        """shells - all the shells in this Shape"""
-        if self.wrapped is None:
-            return ShapeList()
-        return ShapeList([Shell(i) for i in self._entities(Shell.__name__)])
-
-    def shell(self) -> Shell:
-        """Return the Shell"""
-        shells = self.shells()
-        shell_count = len(shells)
-        if shell_count != 1:
-            warnings.warn(
-                f"Found {shell_count} shells, returning first",
-                stacklevel=2,
-            )
-        return shells[0]
-
-    def solids(self) -> ShapeList[Solid]:
-        """solids - all the solids in this Shape"""
-        if self.wrapped is None:
-            return ShapeList()
-        return ShapeList([Solid(i) for i in self._entities(Solid.__name__)])
-
-    def solid(self) -> Solid:
-        """Return the Solid"""
-        solids = self.solids()
-        solid_count = len(solids)
-        if solid_count != 1:
-            warnings.warn(
-                f"Found {solid_count} solids, returning first",
-                stacklevel=2,
-            )
-        return solids[0]
+        return shape_list[0] if shape_list else None
 
     @property
     def area(self) -> float:
