@@ -1,3 +1,41 @@
+"""
+refactor topology
+
+name: refactor_topology.py
+by:   Gumyr
+date: Dec 05, 2024
+
+desc:
+    This python script refactors the very large topology.py module into several
+    files based on the topological heirarchical order:
+    + shape_core.py - base classes Shape, ShapeList
+    + utils.py - utility classes & functions
+    + zero_d.py - Vertex
+    + one_d.py - Mixin1D, Edge, Wire
+    + two_d.py - Mixin2D, Face, Shell
+    + three_d.py - Mixin3D, Solid
+    + composite.py - Compound
+    Each of these modules import lower order modules to avoid import loops. They
+    also may contain functions used both by end users and higher order modules.
+
+license:
+
+    Copyright 2024 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
+
 from pathlib import Path
 import libcst as cst
 import libcst.matchers as m
@@ -134,7 +172,6 @@ def write_topo_class_files(
         ],
         "utils": [
             "delta",
-            "edges_to_wires",
             "_extrude_topods_shape",
             "find_max_dimension",
             "isclose_b",
@@ -153,6 +190,7 @@ def write_topo_class_files(
             "topo_explore_common_vertex",
         ],
         "one_d": [
+            "edges_to_wires",
             "topo_explore_connected_edges",
         ],
         "two_d": ["sort_wires_by_build_order"],
@@ -169,6 +207,7 @@ def write_topo_class_files(
             "ShapeList",
             "Joint",
             "SkipClean",
+            "BoundBox",
         ],
         "zero_d": ["Vertex"],
         "one_d": ["Mixin1D", "Edge", "Wire"],
@@ -227,7 +266,7 @@ license:
         additional_imports = []
         if group_name != "shape_core":
             additional_imports.append(
-                "from .shape_core import Shape, ShapeList, SkipClean, TrimmingTool, Joint"
+                "from .shape_core import Shape, ShapeList, BoundBox, SkipClean, TrimmingTool, Joint"
             )
             additional_imports.append("from .utils import _ClassMethodProxy")
         if group_name not in ["shape_core", "vertex"]:
@@ -253,7 +292,7 @@ license:
 
         # Add TYPE_CHECKING imports
         if group_name not in ["composite"]:
-            additional_imports.append("if TYPE_CHECKING:")
+            additional_imports.append("if TYPE_CHECKING: # pragma: no cover")
         if group_name in ["shape_core", "utils"]:
             additional_imports.append("    from .zero_d import Vertex")
         if group_name in ["shape_core", "utils", "zero_d"]:
@@ -343,13 +382,13 @@ license:
         print(f"Created {class_file}")
 
     # Create __init__.py to make it a proper package
-    init_file = output_dir / "__init__.py"
-    init_content = []
-    for group_name in class_groups.keys():
-        init_content.append(f"from .{group_name} import *")
+    # init_file = output_dir / "__init__.py"
+    # init_content = []
+    # for group_name in class_groups.keys():
+    #     init_content.append(f"from .{group_name} import *")
 
-    init_file.write_text("\n".join(init_content))
-    print(f"Created {init_file}")
+    # init_file.write_text("\n".join(init_content))
+    # print(f"Created {init_file}")
 
 
 def remove_unused_imports(file_path: Path, project: Project) -> None:
@@ -404,12 +443,15 @@ class UnionToPipeTransformer(cst.CSTTransformer):
 def main():
     # Define paths
     script_dir = Path(__file__).parent
-    topo_file = script_dir / "topology.py"
-    output_dir = script_dir / "topology"
+    topo_file = script_dir / ".." / "src" / "build123d" / "topology_old.py"
+    output_dir = script_dir / ".." / "src" / "build123d" / "topology"
+    topo_file = topo_file.resolve()
+    output_dir = output_dir.resolve()
 
     # Define classes to extract
     class_names = [
         "_ClassMethodProxy",
+        "BoundBox",
         "Shape",
         "Compound",
         "Solid",
@@ -464,10 +506,13 @@ def main():
     )
 
     # Create a Rope project instance
-    project = Project(str(script_dir))
+    # project = Project(str(script_dir))
+    project = Project(str(output_dir))
 
     # Clean up imports
     for file in output_dir.glob("*.py"):
+        if file.name == "__init__.py":
+            continue
         remove_unused_imports(file, project)
 
 
