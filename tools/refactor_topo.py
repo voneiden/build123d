@@ -45,6 +45,196 @@ from rope.refactor.importutils import ImportOrganizer
 import subprocess
 from datetime import datetime
 
+module_descriptions = {
+    "shape_core": """
+This module defines the foundational classes and methods for the build123d CAD library, enabling
+detailed geometric operations and 3D modeling capabilities. It provides a hierarchy of classes
+representing various geometric entities like vertices, edges, wires, faces, shells, solids, and
+compounds. These classes are designed to work seamlessly with the OpenCascade Python bindings,
+leveraging its robust CAD kernel.
+
+Key Features:
+- **Shape Base Class:** Implements core functionalities such as transformations (rotation,
+  translation, scaling), geometric queries, and boolean operations (cut, fuse, intersect).
+- **Custom Utilities:** Includes helper classes like `ShapeList` for advanced filtering, sorting,
+  and grouping of shapes, and `GroupBy` for organizing shapes by specific criteria.
+- **Type Safety:** Extensive use of Python typing features ensures clarity and correctness in type
+  handling.
+- **Advanced Geometry:** Supports operations like finding intersections, computing bounding boxes,
+  projecting faces, and generating triangulated meshes.
+
+The module is designed for extensibility, enabling developers to build complex 3D assemblies and
+perform detailed CAD operations programmatically while maintaining a clean and structured API.
+""",
+    "utils": """
+This module provides utility functions and helper classes for the build123d CAD library, enabling
+advanced geometric operations and facilitating the use of the OpenCascade CAD kernel. It complements
+the core library by offering reusable and modular tools for manipulating shapes, performing Boolean
+operations, and validating geometry.
+
+Key Features:
+- **Geometric Utilities**:
+  - `polar`: Converts polar coordinates to Cartesian.
+  - `tuplify`: Normalizes inputs into consistent tuples.
+  - `find_max_dimension`: Computes the maximum bounding dimension of shapes.
+
+- **Shape Creation**:
+  - `_make_loft`: Creates lofted shapes from wires and vertices.
+  - `_make_topods_compound_from_shapes`: Constructs compounds from multiple shapes.
+  - `_make_topods_face_from_wires`: Generates planar faces with optional holes.
+
+- **Boolean Operations**:
+  - `_topods_bool_op`: Generic Boolean operations for TopoDS_Shapes.
+  - `new_edges`: Identifies newly created edges from combined shapes.
+
+- **Utility Classes**:
+  - `_ClassMethodProxy`: Dynamically binds methods across classes.
+
+- **Enhanced Math**:
+  - `isclose_b`: Overrides `math.isclose` with a stricter absolute tolerance.
+
+This module is a critical component of build123d, supporting complex CAD workflows and geometric
+transformations while maintaining a clean, extensible API.
+""",
+    "zero_d": """
+This module provides the foundational implementation for zero-dimensional geometry in the build123d
+CAD system, focusing on the `Vertex` class and its related operations. A `Vertex` represents a
+single point in 3D space, serving as the cornerstone for more complex geometric structures such as
+edges, wires, and faces. It is directly integrated with the OpenCascade kernel, enabling precise
+modeling and manipulation of 3D objects.
+
+Key Features:
+- **Vertex Class**:
+  - Supports multiple constructors, including Cartesian coordinates, iterable inputs, and
+    OpenCascade `TopoDS_Vertex` objects.
+  - Offers robust arithmetic operations such as addition and subtraction with other vertices,
+    vectors, or tuples.
+  - Provides utility methods for transforming vertices, converting to tuples, and iterating over
+    coordinate components.
+
+- **Intersection Utilities**:
+  - Includes `topo_explore_common_vertex`, a utility to identify shared vertices between edges,
+    facilitating advanced topological queries.
+
+- **Integration with Shape Hierarchy**:
+  - Extends the `Shape` base class, inheriting essential features such as transformation matrices
+    and bounding box computations.
+
+This module plays a critical role in defining precise geometric points and their interactions,
+serving as the building block for complex 3D models in the build123d library.
+""",
+    "one_d": """
+This module defines the classes and methods for one-dimensional geometric entities in the build123d
+CAD library. It focuses on `Edge` and `Wire`, representing essential topological elements like
+curves and connected sequences of curves within a 3D model. These entities are pivotal for
+constructing complex shapes, boundaries, and paths in CAD applications.
+
+Key Features:
+- **Edge Class**:
+  - Represents curves such as lines, arcs, splines, and circles.
+  - Supports advanced operations like trimming, offsetting, splitting, and projecting onto shapes.
+  - Includes methods for geometric queries like finding tangent angles, normals, and intersection
+    points.
+
+- **Wire Class**:
+  - Represents a connected sequence of edges forming a continuous path.
+  - Supports operations such as closure, projection, and edge manipulation.
+
+- **Mixin1D**:
+  - Shared functionality for both `Edge` and `Wire` classes, enabling splitting, extrusion, and
+    1D-specific operations.
+
+This module integrates deeply with OpenCascade, leveraging its robust geometric and topological
+operations. It provides utility functions to create, manipulate, and query 1D geometric entities,
+ensuring precise and efficient workflows in 3D modeling tasks.
+""",
+    "two_d": """
+This module provides classes and methods for two-dimensional geometric entities in the build123d CAD
+library, focusing on the `Face` and `Shell` classes. These entities form the building blocks for
+creating and manipulating complex 2D surfaces and 3D shells, enabling precise modeling for CAD
+applications.
+
+Key Features:
+- **Mixin2D**:
+  - Adds shared functionality to `Face` and `Shell` classes, such as splitting, extrusion, and
+    projection operations.
+
+- **Face Class**:
+  - Represents a 3D bounded surface with advanced features like trimming, offsetting, and Boolean
+    operations.
+  - Provides utilities for creating faces from wires, arrays of points, Bézier surfaces, and ruled
+    surfaces.
+  - Enables geometry queries like normal vectors, surface centers, and planarity checks.
+
+- **Shell Class**:
+  - Represents a collection of connected faces forming a closed surface.
+  - Supports operations like lofting and sweeping profiles along paths.
+
+- **Utilities**:
+  - Includes methods for sorting wires into buildable faces and creating holes within faces
+    efficiently.
+
+The module integrates deeply with OpenCascade to leverage its powerful CAD kernel, offering robust
+and extensible tools for surface and shell creation, manipulation, and analysis.
+""",
+    "three_d": """
+This module defines the `Solid` class and associated methods for creating, manipulating, and
+querying three-dimensional solid geometries in the build123d CAD system. It provides powerful tools
+for constructing complex 3D models, including operations such as extrusion, sweeping, filleting,
+chamfering, and Boolean operations. The module integrates with OpenCascade to leverage its robust
+geometric kernel for precise 3D modeling.
+
+Key Features:
+- **Solid Class**:
+  - Represents closed, bounded 3D shapes with methods for volume calculation, bounding box
+    computation, and validity checks.
+  - Includes constructors for primitive solids (e.g., box, cylinder, cone, torus) and advanced
+    operations like lofting, revolving, and sweeping profiles along paths.
+
+- **Mixin3D**:
+  - Adds shared methods for operations like filleting, chamfering, splitting, and hollowing solids.
+  - Supports advanced workflows such as finding maximum fillet radii and extruding with rotation or
+    taper.
+
+- **Boolean Operations**:
+  - Provides utilities for union, subtraction, and intersection of solids.
+
+- **Thickening and Offsetting**:
+  - Allows transformation of faces or shells into solids through thickening.
+
+This module is essential for generating and manipulating complex 3D geometries in the build123d
+library, offering a comprehensive API for CAD modeling.
+""",
+    "composite": """
+This module defines advanced composite geometric entities for the build123d CAD system. It
+introduces the `Compound` class as a central concept for managing groups of shapes, alongside
+specialized subclasses such as `Curve`, `Sketch`, and `Part` for 1D, 2D, and 3D objects,
+respectively. These classes streamline the construction and manipulation of complex geometric
+assemblies.
+
+Key Features:
+- **Compound Class**:
+  - Represents a collection of geometric shapes (e.g., vertices, edges, faces, solids) grouped
+    hierarchically.
+  - Supports operations like adding, removing, and combining shapes, as well as querying volumes,
+    centers, and intersections.
+  - Provides utility methods for unwrapping nested compounds and generating 3D text or coordinate
+    system triads.
+
+- **Specialized Subclasses**:
+  - `Curve`: Handles 1D objects like edges and wires.
+  - `Sketch`: Focused on 2D objects, such as faces.
+  - `Part`: Manages 3D solids and assemblies.
+
+- **Advanced Features**:
+  - Includes Boolean operations, hierarchy traversal, and bounding box-based intersection detection.
+  - Supports transformations, child-parent relationships, and dynamic updates.
+
+This module leverages OpenCascade for robust geometric operations while offering a Pythonic
+interface for efficient and extensible CAD modeling workflows.
+""",
+}
+
 
 class ImportCollector(cst.CSTVisitor):
     def __init__(self):
@@ -179,8 +369,6 @@ def write_topo_class_files(
             "_make_topods_compound_from_shapes",
             "_make_topods_face_from_wires",
             "new_edges",
-            "parse_arguments",
-            "parse_kwargs",
             "polar",
             "_topods_bool_op",
             "tuplify",
@@ -225,7 +413,7 @@ by:   Gumyr
 date: {datetime.now().strftime('%B %d, %Y')}
 
 desc:
-
+{module_descriptions[group_name]}
 license:
 
     Copyright {datetime.now().strftime('%Y')} Gumyr
@@ -294,16 +482,24 @@ license:
         if group_name not in ["composite"]:
             additional_imports.append("if TYPE_CHECKING: # pragma: no cover")
         if group_name in ["shape_core", "utils"]:
-            additional_imports.append("    from .zero_d import Vertex")
+            additional_imports.append(
+                "    from .zero_d import Vertex # pylint: disable=R0801"
+            )
         if group_name in ["shape_core", "utils", "zero_d"]:
-            additional_imports.append("    from .one_d import Edge, Wire")
+            additional_imports.append(
+                "    from .one_d import Edge, Wire # pylint: disable=R0801"
+            )
         if group_name in ["shape_core", "utils", "one_d"]:
-            additional_imports.append("    from .two_d import Face, Shell")
+            additional_imports.append(
+                "    from .two_d import Face, Shell # pylint: disable=R0801"
+            )
         if group_name in ["shape_core", "utils", "one_d", "two_d"]:
-            additional_imports.append("    from .three_d import Solid")
+            additional_imports.append(
+                "    from .three_d import Solid # pylint: disable=R0801"
+            )
         if group_name in ["shape_core", "utils", "one_d", "two_d", "three_d"]:
             additional_imports.append(
-                "    from .composite import Compound, Curve, Sketch, Part"
+                "    from .composite import Compound, Curve, Sketch, Part # pylint: disable=R0801"
             )
         # Create class file (e.g., two_d.py)
         class_file = output_dir / f"{group_name}.py"
@@ -321,7 +517,10 @@ license:
                     body.append(func)
 
                 # If this is the "apply_ocp_monkey_patches" function, add a call to it
-                if func.name.value == "apply_ocp_monkey_patches":
+                if (
+                    group_name == "shape_core"
+                    and func.name.value == "apply_ocp_monkey_patches"
+                ):
                     apply_patches_call = cst.Expr(
                         value=cst.Call(func=cst.Name("apply_ocp_monkey_patches"))
                     )
@@ -382,13 +581,102 @@ license:
         print(f"Created {class_file}")
 
     # Create __init__.py to make it a proper package
-    # init_file = output_dir / "__init__.py"
-    # init_content = []
-    # for group_name in class_groups.keys():
-    #     init_content.append(f"from .{group_name} import *")
+    init_file = output_dir / "__init__.py"
+    init_content = f'''
+"""
+build123d.topology package
 
-    # init_file.write_text("\n".join(init_content))
-    # print(f"Created {init_file}")
+name: __init__.py
+by:   Gumyr
+date: {datetime.now().strftime('%B %d, %Y')}
+
+desc: 
+    This package contains modules for representing and manipulating 3D geometric shapes,
+    including operations on vertices, edges, faces, solids, and composites.
+    The package provides foundational classes to work with 3D objects, and methods to
+    manipulate and analyze those objects.
+
+license:
+
+    Copyright {datetime.now().strftime('%Y')} Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
+
+from .shape_core import (
+    Shape,
+    Comparable,
+    ShapePredicate,
+    GroupBy,
+    ShapeList,
+    Joint,
+    SkipClean,
+    BoundBox,
+    downcast,
+    fix,
+    unwrap_topods_compound,
+)
+from .utils import (
+    tuplify,
+    isclose_b,
+    polar,
+    delta,
+    new_edges,
+    find_max_dimension,
+)
+from .zero_d import Vertex, topo_explore_common_vertex
+from .one_d import Edge, Wire, edges_to_wires, topo_explore_connected_edges
+from .two_d import Face, Shell, sort_wires_by_build_order
+from .three_d import Solid
+from .composite import Compound, Curve, Sketch, Part
+
+__all__ = [
+    "Shape",
+    "Comparable",
+    "ShapePredicate",
+    "GroupBy",
+    "ShapeList",
+    "Joint",
+    "SkipClean",
+    "BoundBox",
+    "downcast",
+    "fix",
+    "unwrap_topods_compound",
+    "tuplify",
+    "isclose_b",
+    "polar",
+    "delta",
+    "new_edges",
+    "find_max_dimension",
+    "Vertex",
+    "topo_explore_common_vertex",
+    "Edge",
+    "Wire",
+    "edges_to_wires",
+    "topo_explore_connected_edges",
+    "Face",
+    "Shell",
+    "sort_wires_by_build_order",
+    "Solid",
+    "Compound",
+    "Curve",
+    "Sketch",
+    "Part",
+]
+'''
+    init_file.write_text(init_content)
+    print(f"Created {init_file}")
 
 
 def remove_unused_imports(file_path: Path, project: Project) -> None:
