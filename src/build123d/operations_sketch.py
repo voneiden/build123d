@@ -305,4 +305,9 @@ def trace(
         context.pending_edges = ShapeList()
 
     combined_faces = Face.fuse(*new_faces) if len(new_faces) > 1 else new_faces[0]
-    return Sketch(combined_faces.wrapped)
+    result = (
+        Sketch(combined_faces)
+        if isinstance(combined_faces, list)
+        else Sketch(combined_faces.wrapped)
+    )
+    return result
