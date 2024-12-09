@@ -173,7 +173,10 @@ def extrude(
         context._add_to_context(*new_solids, clean=clean, mode=mode)
     else:
         if len(new_solids) > 1:
-            new_solids = [new_solids.pop().fuse(*new_solids)]
+            fused_solids = new_solids.pop().fuse(*new_solids)
+            new_solids = (
+                fused_solids if isinstance(fused_solids, list) else [fused_solids]
+            )
         if clean:
             new_solids = [solid.clean() for solid in new_solids]
 
@@ -597,7 +600,9 @@ def thicken(
         )
         for direction in [1, -1] if both else [1]:
             new_solids.append(
-                face.thicken(depth=amount, normal_override=face_normal * direction)
+                Solid.thicken(
+                    face, depth=amount, normal_override=face_normal * direction
+                )
             )
 
     if context is not None:

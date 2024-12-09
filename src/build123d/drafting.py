@@ -439,23 +439,25 @@ class DimensionLine(BaseSketchObject):
         overage = shaft_length + draft.pad_around_text + label_length / 2
         label_u_values = [0.5, -overage / path_length, 1 + overage / path_length]
 
-        # d_lines = Sketch(children=arrows[0])
         d_lines = {}
-        # for arrow_pair in arrow_shapes:
         for u_value in label_u_values:
-            d_line = Sketch()
-            for add_arrow, arrow_shape in zip(arrows, arrow_shapes):
-                if add_arrow:
-                    d_line += arrow_shape
+            select_arrow_shapes = [
+                arrow_shape
+                for add_arrow, arrow_shape in zip(arrows, arrow_shapes)
+                if add_arrow
+            ]
+            d_line = Sketch(select_arrow_shapes)
             flip_label = path_obj.tangent_at(u_value).get_angle(Vector(1, 0, 0)) >= 180
             loc = Draft._sketch_location(path_obj, u_value, flip_label)
             placed_label = label_shape.located(loc)
-            self_intersection = d_line.intersect(placed_label).area
+            self_intersection = Sketch.intersect(d_line, placed_label).area
             d_line += placed_label
             bbox_size = d_line.bounding_box().size
 
             # Minimize size while avoiding intersections
-            common_area = 0.0 if sketch is None else d_line.intersect(sketch).area
+            common_area = (
+                0.0 if sketch is None else Sketch.intersect(d_line, sketch).area
+            )
             common_area += self_intersection
             score = (d_line.area - 10 * common_area) / bbox_size.X
             d_lines[d_line] = score

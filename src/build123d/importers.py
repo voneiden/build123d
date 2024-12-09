@@ -113,7 +113,7 @@ def import_brep(file_name: Union[PathLike, str, bytes]) -> Shape:
     if shape.IsNull():
         raise ValueError(f"Could not import {file_name}")
 
-    return Shape.cast(shape)
+    return Compound.cast(shape)
 
 
 def import_step(filename: Union[PathLike, str, bytes]) -> Compound:

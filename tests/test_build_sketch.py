@@ -480,8 +480,6 @@ class TestBuildSketchObjects(unittest.TestCase):
 
         line = Polyline((0, 0), (10, 10), (20, 10))
         test = trace(line, 4)
-        self.assertEqual(len(test.faces()), 3)
-        test = trace(line, 4).clean()
         self.assertEqual(len(test.faces()), 1)
 
     def test_full_round(self):

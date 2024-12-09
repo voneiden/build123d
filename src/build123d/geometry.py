@@ -963,7 +963,7 @@ class BoundBox:
         return result
 
     @classmethod
-    def _from_topo_ds(
+    def from_topo_ds(
         cls,
         shape: TopoDS_Shape,
         tolerance: float = None,

@@ -40,9 +40,8 @@ from build123d.topology import (
     Sketch,
     topo_explore_connected_edges,
     topo_explore_common_vertex,
-    TOLERANCE,
 )
-from build123d.geometry import Vector
+from build123d.geometry import Vector, TOLERANCE
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_sketch import BuildSketch
 from scipy.spatial import Voronoi

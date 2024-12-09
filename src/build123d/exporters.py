@@ -55,17 +55,14 @@ from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum  # type: ignore
 from OCP.TopExp import TopExp_Explorer  # type: ignore
 from typing_extensions import Self
 
-from build123d.build_enums import Unit
-from build123d.geometry import TOLERANCE, Color
+from build123d.build_enums import Unit, GeomType
+from build123d.geometry import TOLERANCE, Color, Vector, VectorLike
 from build123d.topology import (
     BoundBox,
     Compound,
     Edge,
     Wire,
-    GeomType,
     Shape,
-    Vector,
-    VectorLike,
 )
 from build123d.build_common import UNITS_PER_METER
 
@@ -682,7 +679,7 @@ class ExportDXF(Export2D):
 
     def _convert_circle(self, edge: Edge, attribs: dict):
         """Converts a Circle object into a DXF circle entity."""
-        curve = edge._geom_adaptor()
+        curve = edge.geom_adaptor()
         circle = curve.Circle()
         center = self._convert_point(circle.Location())
         radius = circle.Radius()
@@ -710,7 +707,7 @@ class ExportDXF(Export2D):
 
     def _convert_ellipse(self, edge: Edge, attribs: dict):
         """Converts an Ellipse object into a DXF ellipse entity."""
-        geom = edge._geom_adaptor()
+        geom = edge.geom_adaptor()
         ellipse = geom.Ellipse()
         minor_radius = ellipse.MinorRadius()
         major_radius = ellipse.MajorRadius()
@@ -743,7 +740,7 @@ class ExportDXF(Export2D):
 
         # This pulls the underlying Geom_BSplineCurve out of the Edge.
         # The adaptor also supplies a parameter range for the curve.
-        adaptor = edge._geom_adaptor()
+        adaptor = edge.geom_adaptor()
         curve = adaptor.Curve().Curve()
         u1 = adaptor.FirstParameter()
         u2 = adaptor.LastParameter()
@@ -1157,7 +1154,7 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _line_segment(self, edge: Edge, reverse: bool) -> PT.Line:
-        curve = edge._geom_adaptor()
+        curve = edge.geom_adaptor()
         fp = curve.FirstParameter()
         lp = curve.LastParameter()
         (u0, u1) = (lp, fp) if reverse else (fp, lp)
@@ -1187,7 +1184,7 @@ class ExportSVG(Export2D):
 
     def _circle_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
         # pylint: disable=too-many-locals
-        curve = edge._geom_adaptor()
+        curve = edge.geom_adaptor()
         circle = curve.Circle()
         radius = circle.Radius()
         x_axis = circle.XAxis().Direction()
@@ -1215,7 +1212,7 @@ class ExportSVG(Export2D):
     def _circle_element(self, edge: Edge) -> ET.Element:
         """Converts a Circle object into an SVG circle element."""
         if edge.is_closed:
-            curve = edge._geom_adaptor()
+            curve = edge.geom_adaptor()
             circle = curve.Circle()
             radius = circle.Radius()
             center = circle.Location()
@@ -1233,7 +1230,7 @@ class ExportSVG(Export2D):
 
     def _ellipse_segments(self, edge: Edge, reverse: bool) -> list[PathSegment]:
         # pylint: disable=too-many-locals
-        curve = edge._geom_adaptor()
+        curve = edge.geom_adaptor()
         ellipse = curve.Ellipse()
         minor_radius = ellipse.MinorRadius()
         major_radius = ellipse.MajorRadius()
@@ -1276,7 +1273,7 @@ class ExportSVG(Export2D):
 
         # This pulls the underlying Geom_BSplineCurve out of the Edge.
         # The adaptor also supplies a parameter range for the curve.
-        adaptor = edge._geom_adaptor()
+        adaptor = edge.geom_adaptor()
         spline = adaptor.Curve().Curve()
         u1 = adaptor.FirstParameter()
         u2 = adaptor.LastParameter()
