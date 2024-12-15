@@ -450,7 +450,7 @@ class Vector:
 
     def __hash__(self) -> int:
         """Hash of Vector"""
-        return hash(self.X) + hash(self.Y) + hash(self.Z)
+        return hash(round(self.X, 6)) + hash(round(self.Y, 6)) + hash(round(self.Z, 6))
 
     def __copy__(self) -> Vector:
         """Return copy of self"""
