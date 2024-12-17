@@ -10,7 +10,7 @@ runs:
     - name: python
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: ${{ inputs.python-version }}
     - name: install requirements
       shell: bash
       run: |
