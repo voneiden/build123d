@@ -728,6 +728,24 @@ class UnionToPipeTransformer(cst.CSTTransformer):
         return updated_node
 
 
+class OptionalToPipeTransformer(cst.CSTTransformer):
+    def leave_Annotation(
+        self, original_node: cst.Annotation, updated_node: cst.Annotation
+    ) -> cst.Annotation:
+        # Match Optional[...] annotations
+        if m.matches(updated_node.annotation, m.Subscript(value=m.Name("Optional"))):
+            subscript = updated_node.annotation
+            if isinstance(subscript, cst.Subscript) and subscript.slice:
+                # Extract the inner type of Optional
+                inner_type = subscript.slice[0].slice.value
+                # Replace Optional[X] with X | None
+                new_annotation = cst.BinaryOperation(
+                    left=inner_type, operator=cst.BitOr(), right=cst.Name("None")
+                )
+                return updated_node.with_changes(annotation=new_annotation)
+        return updated_node
+
+
 def main():
     # Define paths
     script_dir = Path(__file__).parent
@@ -765,6 +783,7 @@ def main():
     # Parse source file and collect imports
     source_tree = cst.parse_module(topo_file.read_text())
     source_tree = source_tree.visit(UnionToPipeTransformer())
+    source_tree = source_tree.visit(OptionalToPipeTransformer())
     # transformed_module = source_tree.visit(UnionToPipeTransformer())
     # print(transformed_module.code)
 

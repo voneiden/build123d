@@ -468,18 +468,18 @@ class Mixin1D:
     @overload
     def split(
         self, tool: TrimmingTool, keep: Literal[Keep.TOP, Keep.BOTTOM]
-    ) -> Optional[Self] | Optional[list[Self]]:
+    ) -> Self | list[Self] | None:
         """split and keep inside or outside"""
 
     @overload
     def split(self, tool: TrimmingTool, keep: Literal[Keep.BOTH]) -> tuple[
-        Optional[Self] | Optional[list[Self]],
-        Optional[Self] | Optional[list[Self]],
+        Self | list[Self] | None,
+        Self | list[Self] | None,
     ]:
         """split and keep inside and outside"""
 
     @overload
-    def split(self, tool: TrimmingTool) -> Optional[Self] | Optional[list[Self]]:
+    def split(self, tool: TrimmingTool) -> Self | list[Self] | None:
         """split and keep inside (default)"""
 
     def split(self, tool: TrimmingTool, keep: Keep = Keep.TOP):
@@ -494,8 +494,8 @@ class Mixin1D:
         Returns:
             Shape: result of split
         Returns:
-            Optional[Self] | Optional[list[Self]],
-            Tuple[Optional[Self] | Optional[list[Self]]]: The result of the split operation.
+            Self | list[Self] | None,
+            Tuple[Self | list[Self] | None]: The result of the split operation.
 
             - **Keep.TOP**: Returns the top as a `Self` or `list[Self]`, or `None`
               if no top is found.
@@ -3204,22 +3204,22 @@ class Shape(NodeMixin):
     @overload
     def split_by_perimeter(
         self, perimeter: Union[Edge, Wire], keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
-    ) -> Optional[Face] | Optional[Shell] | Optional[ShapeList[Face]]:
+    ) -> Face | Shell | ShapeList[Face] | None:
         """split_by_perimeter and keep inside or outside"""
 
     @overload
     def split_by_perimeter(
         self, perimeter: Union[Edge, Wire], keep: Literal[Keep.BOTH]
     ) -> tuple[
-        Optional[Face] | Optional[Shell] | Optional[ShapeList[Face]],
-        Optional[Face] | Optional[Shell] | Optional[ShapeList[Face]],
+        Face | Shell | ShapeList[Face] | None,
+        Face | Shell | ShapeList[Face] | None,
     ]:
         """split_by_perimeter and keep inside and outside"""
 
     @overload
     def split_by_perimeter(
         self, perimeter: Union[Edge, Wire]
-    ) -> Optional[Face] | Optional[Shell] | Optional[ShapeList[Face]]:
+    ) -> Face | Shell | ShapeList[Face] | None:
         """split_by_perimeter and keep inside (default)"""
 
     def split_by_perimeter(
@@ -3241,8 +3241,8 @@ class Shape(NodeMixin):
             ValueError: keep must be one of Keep.INSIDE|OUTSIDE|BOTH
 
         Returns:
-            Union[Optional[Shell], Optional[Face],
-            Tuple[Optional[Shell], Optional[Face]]]: The result of the split operation.
+            Union[Face | Shell | ShapeList[Face] | None,
+            Tuple[Face | Shell | ShapeList[Face] | None]: The result of the split operation.
 
             - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or `None`
               if no inside part is found.
