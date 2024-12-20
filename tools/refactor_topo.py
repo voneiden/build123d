@@ -87,9 +87,6 @@ Key Features:
   - `_topods_bool_op`: Generic Boolean operations for TopoDS_Shapes.
   - `new_edges`: Identifies newly created edges from combined shapes.
 
-- **Utility Classes**:
-  - `_ClassMethodProxy`: Dynamically binds methods across classes.
-
 - **Enhanced Math**:
   - `isclose_b`: Overrides `math.isclose` with a stricter absolute tolerance.
 
@@ -354,7 +351,7 @@ def write_topo_class_files(
             "get_top_level_topods_shapes",
             "_sew_topods_faces",
             "shapetype",
-            "_topods_compound_dim",
+            "topods_dim",
             "_topods_entities",
             "_topods_face_normal_at",
             "apply_ocp_monkey_patches",
@@ -386,7 +383,6 @@ def write_topo_class_files(
 
     # Define class groupings based on layers
     class_groups = {
-        "utils": ["_ClassMethodProxy"],
         "shape_core": [
             "Shape",
             "Comparable",
@@ -456,7 +452,6 @@ license:
             additional_imports.append(
                 "from .shape_core import Shape, ShapeList, BoundBox, SkipClean, TrimmingTool, Joint"
             )
-            additional_imports.append("from .utils import _ClassMethodProxy")
         if group_name not in ["shape_core", "vertex"]:
             for sub_group_name in function_source.keys():
                 additional_imports.append(
@@ -508,26 +503,6 @@ license:
         # if group_name in ["shape_core", "utils"]:
         if group_name in function_source.keys():
             body = [*cst.parse_module(all_imports_code).body]
-            for func in function_collector.functions:
-                if group_name == "shape_core" and func.name.value in [
-                    "_topods_compound_dim",
-                    "_topods_face_normal_at",
-                    "apply_ocp_monkey_patches",
-                ]:
-                    body.append(func)
-
-                # If this is the "apply_ocp_monkey_patches" function, add a call to it
-                if (
-                    group_name == "shape_core"
-                    and func.name.value == "apply_ocp_monkey_patches"
-                ):
-                    apply_patches_call = cst.Expr(
-                        value=cst.Call(func=cst.Name("apply_ocp_monkey_patches"))
-                    )
-                    body.append(apply_patches_call)
-                    body.append(cst.EmptyLine(indent=False))
-                    body.append(cst.EmptyLine(indent=False))
-
             if group_name == "shape_core":
                 for var in variable_collector.global_variables:
                     # Check the name of the assigned variable(s)
@@ -562,13 +537,7 @@ license:
                                     body.append(cst.EmptyLine(indent=False))
 
             for func in function_collector.functions:
-                if func.name.value in function_source[
-                    group_name
-                ] and func.name.value not in [
-                    "_topods_compound_dim",
-                    "_topods_face_normal_at",
-                    "apply_ocp_monkey_patches",
-                ]:
+                if func.name.value in function_source[group_name]:
                     body.append(func)
             class_module = cst.Module(body=body, header=header)
         else:
@@ -756,7 +725,6 @@ def main():
 
     # Define classes to extract
     class_names = [
-        "_ClassMethodProxy",
         "BoundBox",
         "Shape",
         "Compound",

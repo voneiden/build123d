@@ -53,6 +53,7 @@ from OCP.HLRAlgo import HLRAlgo_Projector  # type: ignore
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape  # type: ignore
 from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum  # type: ignore
 from OCP.TopExp import TopExp_Explorer  # type: ignore
+from OCP.TopoDS import TopoDS
 from typing_extensions import Self
 
 from build123d.build_enums import Unit, GeomType
@@ -1060,7 +1061,7 @@ class ExportSVG(Export2D):
         )
         while explorer.More():
             topo_wire = explorer.Current()
-            loose_wires.append(Wire(topo_wire))
+            loose_wires.append(Wire(TopoDS.Wire_s(topo_wire)))
             explorer.Next()
         # print(f"{len(loose_wires)} loose wires")
         for wire in loose_wires:
@@ -1097,12 +1098,13 @@ class ExportSVG(Export2D):
 
     @staticmethod
     def _wire_edges(wire: Wire, reverse: bool) -> List[Edge]:
-        edges = []
-        explorer = BRepTools_WireExplorer(wire.wrapped)
-        while explorer.More():
-            topo_edge = explorer.Current()
-            edges.append(Edge(topo_edge))
-            explorer.Next()
+        # edges = []
+        # explorer = BRepTools_WireExplorer(wire.wrapped)
+        # while explorer.More():
+        #     topo_edge = explorer.Current()
+        #     edges.append(Edge(topo_edge))
+        #     explorer.Next()
+        edges = wire.edges()
         if reverse:
             edges.reverse()
         return edges

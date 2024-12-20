@@ -32,6 +32,8 @@ from build123d import (
 )
 from build123d.exporters import ExportSVG, ExportDXF, Drawing, LineType
 
+from ocp_vscode import show
+
 
 class ExportersTestCase(unittest.TestCase):
     @staticmethod

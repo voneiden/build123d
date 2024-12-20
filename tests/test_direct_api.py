@@ -3211,10 +3211,6 @@ class TestShape(DirectApiTestCase):
         self.assertVectorAlmostEquals(box.position, (1, 2, 3), 5)
         self.assertVectorAlmostEquals(box.orientation, (10, 20, 30), 5)
 
-    def test_copy(self):
-        with self.assertWarns(DeprecationWarning):
-            Solid.make_box(1, 1, 1).copy()
-
     def test_distance_to_with_closest_points(self):
         s0 = Solid.make_sphere(1).locate(Location((0, 2.1, 0)))
         s1 = Solid.make_sphere(1)

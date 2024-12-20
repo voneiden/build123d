@@ -542,7 +542,7 @@ class Vector:
 
 #:TypeVar("VectorLike"): Tuple of float or Vector defining a position in space
 VectorLike = Union[
-    Vector, tuple[float, float], tuple[float, float, float], Iterable[float]
+    Vector, tuple[float, float], tuple[float, float, float], Sequence[float]
 ]
 
 

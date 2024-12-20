@@ -57,6 +57,7 @@ from typing import (
     Optional,
     Protocol,
     Sequence,
+    SupportsIndex,
     Tuple,
     Type,
     TypeVar,
@@ -78,6 +79,7 @@ from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 import OCP.GeomAbs as ga  # Geometry type enum
 import OCP.TopAbs as ta  # Topology type enum
 from OCP.Aspect import Aspect_TOL_SOLID
+from OCP.Bnd import Bnd_Box
 from OCP.BOPAlgo import BOPAlgo_GlueEnum
 
 from OCP.BRep import BRep_Tool
@@ -304,16 +306,9 @@ from build123d.geometry import (
 )
 
 
-@property
-def _topods_compound_dim(self) -> int | None:
-    """The dimension of the shapes within the Compound - None if inconsistent"""
-    sub_dims = {s.dim for s in get_top_level_topods_shapes(self)}
-    return sub_dims.pop() if len(sub_dims) == 1 else None
-
-
-def _topods_face_normal_at(self, surface_point: gp_Pnt) -> Vector:
-    """normal_at point on surface"""
-    surface = BRep_Tool.Surface_s(self)
+def _topods_face_normal_at(face: TopoDS_Face, surface_point: gp_Pnt) -> Vector:
+    """Find the normal at a point on surface"""
+    surface = BRep_Tool.Surface_s(face)
 
     # project point on surface
     projector = GeomAPI_ProjectPointOnSurf(surface_point, surface)
@@ -321,25 +316,29 @@ def _topods_face_normal_at(self, surface_point: gp_Pnt) -> Vector:
 
     gp_pnt = gp_Pnt()
     normal = gp_Vec()
-    BRepGProp_Face(self).Normal(u_val, v_val, gp_pnt, normal)
+    BRepGProp_Face(face).Normal(u_val, v_val, gp_pnt, normal)
 
     return Vector(normal).normalized()
 
 
-def apply_ocp_monkey_patches() -> None:
-    """Applies monkey patches to TopoDS classes."""
-    TopoDS_Compound.dim = _topods_compound_dim
-    TopoDS_Face.dim = 2
-    TopoDS_Face.normal_at = _topods_face_normal_at
-    TopoDS_Shape.dim = None
-    TopoDS_Shell.dim = 2
-    TopoDS_Solid.dim = 3
-    TopoDS_Vertex.dim = 0
-    TopoDS_Edge.dim = 1
-    TopoDS_Wire.dim = 1
+def topods_dim(topods: TopoDS_Shape) -> int | None:
+    """Return the dimension of this TopoDS_Shape"""
+    shape_dim_map = {
+        (TopoDS_Vertex,): 0,
+        (TopoDS_Edge, TopoDS_Wire): 1,
+        (TopoDS_Face, TopoDS_Shell): 2,
+        (TopoDS_Solid,): 3,
+    }
 
+    for shape_types, dim in shape_dim_map.items():
+        if isinstance(topods, shape_types):
+            return dim
 
-apply_ocp_monkey_patches()
+    if isinstance(topods, TopoDS_Compound):
+        sub_dims = {topods_dim(s) for s in get_top_level_topods_shapes(topods)}
+        return sub_dims.pop() if len(sub_dims) == 1 else None
+
+    return None
 
 
 HASH_CODE_MAX = 2147483647  # max 32bit signed int, required by OCC.Core.HashCode
@@ -350,7 +349,7 @@ Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 TrimmingTool = Union[Plane, "Shell", "Face"]
 
 
-def tuplify(obj: Any, dim: int) -> tuple:
+def tuplify(obj: Any, dim: int) -> tuple | None:
     """Create a size tuple"""
     if obj is None:
         result = None
@@ -359,48 +358,6 @@ def tuplify(obj: Any, dim: int) -> tuple:
     else:
         result = tuple([obj] * dim)
     return result
-
-
-class _ClassMethodProxy:
-    """
-    A proxy for dynamically binding a class method to different classes.
-
-    This descriptor allows a class method defined in one class to be reused
-    in other classes while ensuring that the `cls` parameter refers to the
-    correct class (the class on which the method is being called). This avoids
-    issues where the method would otherwise always reference the original
-    defining class.
-
-    Attributes:
-        method (classmethod): The class method to be proxied.
-
-    Methods:
-        __get__(instance, owner):
-            Dynamically binds the proxied method to the calling class (`owner`).
-
-    Example:
-        class Mixin1D:
-            @classmethod
-            def extrude(cls, shape, direction):
-                print(f"extrude called on {cls.__name__}")
-
-        class Mixin2D:
-            extrude = ClassMethodProxy(Mixin1D.extrude)
-
-        class Mixin3D:
-            extrude = ClassMethodProxy(Mixin1D.extrude)
-
-        # Usage
-        Mixin2D.extrude(None, None)  # Output: extrude called on Mixin2D
-        Mixin3D.extrude(None, None)  # Output: extrude called on Mixin3D
-    """
-
-    def __init__(self, method):
-        self.method = method
-
-    def __get__(self, instance, owner):
-        # Bind the method dynamically as a class method of `owner`
-        return types.MethodType(self.method.__func__, owner)
 
 
 class Mixin1D:
@@ -420,7 +377,7 @@ class Mixin1D:
         if not summands:
             return self
 
-        if not all(summand.dim == 1 for summand in summands):
+        if not all(topods_dim(summand) == 1 for summand in summands):
             raise ValueError("Only shapes with the same dimension can be added")
 
         # Convert back to Edge/Wire objects now that it's safe to do so
@@ -1278,37 +1235,11 @@ class Mixin1D:
 
         return (visible_edges, hidden_edges)
 
-    @classmethod
-    def extrude(
-        cls, obj: Shape, direction: VectorLike
-    ) -> Edge | Face | Shell | Solid | Compound:
-        """extrude
-
-        Extrude a Shape in the provided direction.
-        * Vertices generate Edges
-        * Edges generate Faces
-        * Wires generate Shells
-        * Faces generate Solids
-        * Shells generate Compounds
-
-        Args:
-            direction (VectorLike): direction and magnitude of extrusion
-
-        Raises:
-            ValueError: Unsupported class
-            RuntimeError: Generated invalid result
-
-        Returns:
-            Union[Edge, Face, Shell, Solid, Compound]: extruded shape
-        """
-        return cls.cast(_extrude_topods_shape(obj.wrapped, direction))
-
 
 class Mixin2D:
     """Additional methods to add to Face and Shell class"""
 
     project_to_viewport = Mixin1D.project_to_viewport
-    extrude = _ClassMethodProxy(Mixin1D.extrude)
     split = Mixin1D.split
 
     @classmethod
@@ -1353,6 +1284,8 @@ class Mixin2D:
 
     def __neg__(self) -> Self:
         """Reverse normal operator -"""
+        if self.wrapped is None:
+            raise ValueError("Invalid Shape")
         new_surface = copy.deepcopy(self)
         new_surface.wrapped = downcast(self.wrapped.Complemented())
 
@@ -1367,7 +1300,6 @@ class Mixin3D:
     """Additional methods to add to 3D Shape classes"""
 
     project_to_viewport = Mixin1D.project_to_viewport
-    extrude = _ClassMethodProxy(Mixin1D.extrude)
     split = Mixin1D.split
 
     @classmethod
@@ -1813,7 +1745,10 @@ class Mixin3D:
         return self.__class__(shape)
 
 
-class Shape(NodeMixin):
+TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
+
+
+class Shape(NodeMixin, Generic[TOPODS]):
     """Shape
 
     Base class for all CAD objects such as Edge, Face, Solid, etc.
@@ -1905,12 +1840,14 @@ class Shape(NodeMixin):
 
     def __init__(
         self,
-        obj: TopoDS_Shape = None,
+        obj: TopoDS_Shape | None = None,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
-        self.wrapped = downcast(obj) if obj is not None else None
+        self.wrapped: TOPODS | None = (
+            tcast(Optional[TOPODS], downcast(obj)) if obj is not None else None
+        )
         self.for_construction = False
         self.label = label
         self._color = color
@@ -1919,41 +1856,50 @@ class Shape(NodeMixin):
         self.parent = parent
 
         # Extracted objects like Vertices and Edges may need to know where they came from
-        self.topo_parent: Shape = None
+        self.topo_parent: Shape | None = None
 
     @property
-    def location(self) -> Location:
+    def location(self) -> Location | None:
         """Get this Shape's Location"""
+        if self.wrapped is None:
+            return None
         return Location(self.wrapped.Location())
 
     @location.setter
     def location(self, value: Location):
         """Set Shape's Location to value"""
-        self.wrapped.Location(value.wrapped)
+        if self.wrapped is not None:
+            self.wrapped.Location(value.wrapped)
 
     @property
-    def position(self) -> Vector:
+    def position(self) -> Vector | None:
         """Get the position component of this Shape's Location"""
+        if self.wrapped is None or self.location is None:
+            return None
         return self.location.position
 
     @position.setter
     def position(self, value: VectorLike):
         """Set the position component of this Shape's Location to value"""
         loc = self.location
-        loc.position = value
-        self.location = loc
+        if loc is not None:
+            loc.position = Vector(value)
+            self.location = loc
 
     @property
-    def orientation(self) -> Vector:
+    def orientation(self) -> Vector | None:
         """Get the orientation component of this Shape's Location"""
+        if self.location is None:
+            return None
         return self.location.orientation
 
     @orientation.setter
     def orientation(self, rotations: VectorLike):
         """Set the orientation component of this Shape's Location to rotations"""
         loc = self.location
-        loc.orientation = rotations
-        self.location = loc
+        if loc is not None:
+            loc.orientation = Vector(rotations)
+            self.location = loc
 
     @property
     def color(self) -> Union[None, Color]:
@@ -1962,7 +1908,7 @@ class Shape(NodeMixin):
         # Find the correct color for this node
         if self._color is None:
             # Find parent color
-            current_node = self
+            current_node: Compound | Shape | None = self
             while current_node is not None:
                 parent_color = current_node._color
                 if parent_color is not None:
@@ -1974,6 +1920,11 @@ class Shape(NodeMixin):
         self._color = node_color  # Set the node's color for next time
         return node_color
 
+    @color.setter
+    def color(self, value):
+        """Set the shape's color"""
+        self._color = value
+
     @property
     def is_planar_face(self) -> bool:
         """Is the shape a planar face even though its geom_type may not be PLANE"""
@@ -1983,12 +1934,9 @@ class Shape(NodeMixin):
         is_face_planar = GeomLib_IsPlanarSurface(surface, TOLERANCE)
         return is_face_planar.IsPlanar()
 
-    @color.setter
-    def color(self, value):
-        """Set the shape's color"""
-        self._color = value
-
-    def copy_attributes_to(self, target: Shape, exceptions: Iterable[str] = None):
+    def copy_attributes_to(
+        self, target: Shape, exceptions: Iterable[str] | None = None
+    ):
         """Copy common object attributes to target
 
         Note that preset attributes of target will not be overridden.
@@ -2028,7 +1976,10 @@ class Shape(NodeMixin):
             bool: is the shape manifold or water tight
         """
         # Extract one or more (if a Compound) shape from self
-        shape_stack = get_top_level_topods_shapes(self.wrapped)
+        if self.wrapped is None:
+            shape_stack = []
+        else:
+            shape_stack = get_top_level_topods_shapes(self.wrapped)
         results = []
 
         while shape_stack:
@@ -2052,7 +2003,7 @@ class Shape(NodeMixin):
             # exactly two faces associated with it.
             for i in range(shape_map.Extent()):
                 # Access each edge in the map sequentially
-                edge = downcast(shape_map.FindKey(i + 1))
+                edge = TopoDS.Edge_s(shape_map.FindKey(i + 1))
 
                 vertex0 = TopoDS_Vertex()
                 vertex1 = TopoDS_Vertex()
@@ -2081,15 +2032,15 @@ class Shape(NodeMixin):
         def __init__(
             self,
             label: str = "",
-            address: int = None,
-            position: Union[Vector, Location] = None,
-            parent: Shape._DisplayNode = None,
+            address: int | None = None,
+            position: Union[Vector, Location, None] = None,
+            parent: Shape._DisplayNode | None = None,
         ):
             self.label = label
             self.address = address
             self.position = position
             self.parent = parent
-            self.children = []
+            self.children: list[Shape] = []
 
     _ordered_shapes = [
         TopAbs_ShapeEnum.TopAbs_COMPOUND,
@@ -2105,13 +2056,14 @@ class Shape(NodeMixin):
     def _build_tree(
         shape: TopoDS_Shape,
         tree: list[_DisplayNode],
-        parent: _DisplayNode = None,
+        parent: _DisplayNode | None = None,
         limit: TopAbs_ShapeEnum = TopAbs_ShapeEnum.TopAbs_VERTEX,
         show_center: bool = True,
     ) -> list[_DisplayNode]:
         """Create an anytree copy of the TopoDS_Shape structure"""
 
         obj_type = Shape.shape_LUT[shape.ShapeType()]
+        loc: Vector | Location
         if show_center:
             loc = Shape(shape).bounding_box().center()
         else:
@@ -2177,7 +2129,7 @@ class Shape(NodeMixin):
         limit_class: Literal[
             "Compound", "Edge", "Face", "Shell", "Solid", "Vertex", "Wire"
         ] = "Vertex",
-        show_center: bool = None,
+        show_center: bool | None = None,
     ) -> str:
         """Display internal topology
 
@@ -2205,7 +2157,6 @@ class Shape(NodeMixin):
         Returns:
             str: tree representation of internal structure
         """
-        # if isinstance(self, Compound) and self.children:
         if (
             self.wrapped is not None
             and isinstance(self.wrapped, TopoDS_Compound)
@@ -2215,7 +2166,9 @@ class Shape(NodeMixin):
             result = Shape._show_tree(self, show_center)
         else:
             tree = Shape._build_tree(
-                self.wrapped, tree=[], limit=Shape.inverse_shape_LUT[limit_class]
+                tcast(TopoDS_Shape, self.wrapped),
+                tree=[],
+                limit=Shape.inverse_shape_LUT[limit_class],
             )
             show_center = True if show_center is None else show_center
             result = Shape._show_tree(tree[0], show_center)
@@ -2291,7 +2244,7 @@ class Shape(NodeMixin):
 
         return difference
 
-    def __and__(self, other: Shape) -> Self:
+    def __and__(self, other: Shape | Iterable[Shape]) -> Self | ShapeList[Self]:
         """intersect shape with self operator &"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
@@ -2299,7 +2252,11 @@ class Shape(NodeMixin):
             raise ValueError("Cannot intersect shape with empty compound")
         new_shape = self.intersect(*others)
 
-        if new_shape.wrapped is not None and SkipClean.clean:
+        if (
+            not isinstance(new_shape, list)
+            and new_shape.wrapped is not None
+            and SkipClean.clean
+        ):
             new_shape = new_shape.clean()
 
         return new_shape
@@ -2316,7 +2273,7 @@ class Shape(NodeMixin):
         return [loc * self for loc in other]
 
     @abstractmethod
-    def center(self) -> Vector:
+    def center(self, center_of: CenterOf | None = None) -> Vector:
         """All of the derived classes from Shape need a center method"""
 
     def clean(self) -> Self:
@@ -2327,21 +2284,25 @@ class Shape(NodeMixin):
         Returns:
             Shape: Original object with extraneous internal edges removed
         """
+        if self.wrapped is None:
+            return self
         upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
         upgrader.AllowInternalEdges(False)
         # upgrader.SetAngularTolerance(1e-5)
         try:
             upgrader.Build()
-            self.wrapped = downcast(upgrader.Shape())
+            self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
         except Exception:
             warnings.warn(f"Unable to clean {self}", stacklevel=2)
         return self
 
     def fix(self) -> Self:
         """fix - try to fix shape if not valid"""
+        if self.wrapped is None:
+            return self
         if not self.is_valid():
             shape_copy: Shape = copy.deepcopy(self, None)
-            shape_copy.wrapped = fix(self.wrapped)
+            shape_copy.wrapped = tcast(TOPODS, fix(self.wrapped))
 
             return shape_copy
 
@@ -2356,18 +2317,23 @@ class Shape(NodeMixin):
     def geom_type(self) -> GeomType:
         """Gets the underlying geometry type.
 
-        Args:
-
         Returns:
+            GeomType: The geometry type of the shape
 
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot determine geometry type of an empty shape")
 
         shape: TopAbs_ShapeEnum = shapetype(self.wrapped)
 
         if shape == ta.TopAbs_EDGE:
-            geom = Shape.geom_LUT_EDGE[BRepAdaptor_Curve(self.wrapped).GetType()]
+            geom = Shape.geom_LUT_EDGE[
+                BRepAdaptor_Curve(tcast(TopoDS_Edge, self.wrapped)).GetType()
+            ]
         elif shape == ta.TopAbs_FACE:
-            geom = Shape.geom_LUT_FACE[BRepAdaptor_Surface(self.wrapped).GetType()]
+            geom = Shape.geom_LUT_FACE[
+                BRepAdaptor_Surface(tcast(TopoDS_Face, self.wrapped)).GetType()
+            ]
         else:
             geom = GeomType.OTHER
 
@@ -2382,6 +2348,8 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if self.wrapped is None:
+            return 0
         return self.wrapped.HashCode(HASH_CODE_MAX)
 
     def is_null(self) -> bool:
@@ -2394,7 +2362,7 @@ class Shape(NodeMixin):
         Returns:
 
         """
-        return self.wrapped.IsNull()
+        return self.wrapped is None or self.wrapped.IsNull()
 
     def is_same(self, other: Shape) -> bool:
         """Returns True if other and this shape are same, i.e. if they share the
@@ -2407,6 +2375,8 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if self.wrapped is None or other.wrapped is None:
+            return False
         return self.wrapped.IsSame(other.wrapped)
 
     def is_equal(self, other: Shape) -> bool:
@@ -2420,11 +2390,26 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if self.wrapped is None or other.wrapped is None:
+            return False
         return self.wrapped.IsEqual(other.wrapped)
 
     def __eq__(self, other) -> bool:
-        """Are shapes same operator =="""
-        return self.is_same(other) if isinstance(other, Shape) else NotImplemented
+        """Check if two shapes are the same.
+
+        This method checks if the current shape is the same as the other shape.
+        Two shapes are considered the same if they share the same TShape with
+        the same Locations. Orientations may differ.
+
+        Args:
+            other (Shape): The shape to compare with.
+
+        Returns:
+            bool: True if the shapes are the same, False otherwise.
+        """
+        if isinstance(other, Shape):
+            return self.is_same(other)
+        return NotImplemented
 
     def is_valid(self) -> bool:
         """Returns True if no defect is detected on the shape S or any of its
@@ -2436,11 +2421,15 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if self.wrapped is None:
+            return True
         chk = BRepCheck_Analyzer(self.wrapped)
         chk.SetParallel(True)
         return chk.IsValid()
 
-    def bounding_box(self, tolerance: float = None, optimal: bool = True) -> BoundBox:
+    def bounding_box(
+        self, tolerance: float | None = None, optimal: bool = True
+    ) -> BoundBox:
         """Create a bounding box for this Shape.
 
         Args:
@@ -2449,9 +2438,12 @@ class Shape(NodeMixin):
         Returns:
             BoundBox: A box sized to contain this Shape
         """
+        if self.wrapped is None:
+            return BoundBox(Bnd_Box())
+        tolerance = TOLERANCE if tolerance is None else tolerance
         return BoundBox.from_topo_ds(self.wrapped, tolerance=tolerance, optimal=optimal)
 
-    def mirror(self, mirror_plane: Plane = None) -> Self:
+    def mirror(self, mirror_plane: Plane | None = None) -> Self:
         """
         Applies a mirror transform to this Shape. Does not duplicate objects
         about the plane.
@@ -2464,6 +2456,8 @@ class Shape(NodeMixin):
         if not mirror_plane:
             mirror_plane = Plane.XY
 
+        if self.wrapped is None:
+            return self
         transformation = gp_Trsf()
         transformation.SetMirror(
             gp_Ax2(mirror_plane.origin.to_pnt(), mirror_plane.z_dir.to_dir())
@@ -2500,7 +2494,7 @@ class Shape(NodeMixin):
                 sum_wc = sum_wc.add(weighted_center)
             middle = Vector(sum_wc.multiply(1.0 / total_mass))
         elif center_of == CenterOf.BOUNDING_BOX:
-            total_mass = len(objects)
+            total_mass = len(list(objects))
 
             weighted_centers = []
             for obj in objects:
@@ -2527,6 +2521,9 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if obj.wrapped is None:
+            return 0.0
+
         properties = GProp_GProps()
         calc_function = Shape.shape_properties_LUT[shapetype(obj.wrapped)]
 
@@ -2542,12 +2539,17 @@ class Shape(NodeMixin):
 
     def entities(self, topo_type: Shapes) -> list[TopoDS_Shape]:
         """Return all of the TopoDS sub entities of the given type"""
+        if self.wrapped is None:
+            return []
         return _topods_entities(self.wrapped, topo_type)
 
     def _entities_from(
         self, child_type: Shapes, parent_type: Shapes
     ) -> Dict[Shape, list[Shape]]:
         """This function is very slow on M1 macs and is currently unused"""
+        if self.wrapped is None:
+            return {}
+
         res = TopTools_IndexedDataMapOfShapeListOfShape()
 
         TopExp.MapShapesAndAncestors_s(
@@ -2583,12 +2585,19 @@ class Shape(NodeMixin):
             (e.g., edges, vertices) and other compounds, the method returns a list
             of only the simple shapes directly contained at the top level.
         """
+        if self.wrapped is None:
+            return ShapeList()
         return ShapeList(
             self.__class__.cast(s) for s in get_top_level_topods_shapes(self.wrapped)
         )
 
     @staticmethod
-    def get_shape_list(shape: Shape, entity_type: str) -> ShapeList:
+    def get_shape_list(
+        shape: Shape,
+        entity_type: Literal[
+            "Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"
+        ],
+    ) -> ShapeList:
         """Helper to extract entities of a specific type from a shape."""
         if shape.wrapped is None:
             return ShapeList()
@@ -2600,7 +2609,12 @@ class Shape(NodeMixin):
         return shape_list
 
     @staticmethod
-    def get_single_shape(shape: Shape, entity_type: str) -> Shape:
+    def get_single_shape(
+        shape: Shape,
+        entity_type: Literal[
+            "Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"
+        ],
+    ) -> Shape:
         """Helper to extract a single entity of a specific type from a shape,
         with a warning if count != 1."""
         shape_list = Shape.get_shape_list(shape, entity_type)
@@ -2616,7 +2630,7 @@ class Shape(NodeMixin):
         """vertices - all the vertices in this Shape - subclasses may override"""
         return ShapeList()
 
-    def vertex(self) -> Vertex:
+    def vertex(self) -> Vertex | None:
         """Return the Vertex"""
         return None
 
@@ -2624,7 +2638,7 @@ class Shape(NodeMixin):
         """edges - all the edges in this Shape"""
         return ShapeList()
 
-    def edge(self) -> Edge:
+    def edge(self) -> Edge | None:
         """Return the Edge"""
         return None
 
@@ -2632,7 +2646,7 @@ class Shape(NodeMixin):
         """wires - all the wires in this Shape"""
         return ShapeList()
 
-    def wire(self) -> Wire:
+    def wire(self) -> Wire | None:
         """Return the Wire"""
         return None
 
@@ -2640,7 +2654,7 @@ class Shape(NodeMixin):
         """faces - all the faces in this Shape"""
         return ShapeList()
 
-    def face(self) -> Face:
+    def face(self) -> Face | None:
         """Return the Face"""
         return None
 
@@ -2648,7 +2662,7 @@ class Shape(NodeMixin):
         """shells - all the shells in this Shape"""
         return ShapeList()
 
-    def shell(self) -> Shell:
+    def shell(self) -> Shell | None:
         """Return the Shell"""
         return None
 
@@ -2656,7 +2670,7 @@ class Shape(NodeMixin):
         """solids - all the solids in this Shape"""
         return ShapeList()
 
-    def solid(self) -> Solid:
+    def solid(self) -> Solid | None:
         """Return the Solid"""
         return None
 
@@ -2664,13 +2678,15 @@ class Shape(NodeMixin):
         """compounds - all the compounds in this Shape"""
         return ShapeList()
 
-    def compound(self) -> Compound:
+    def compound(self) -> Compound | None:
         """Return the Compound"""
         return None
 
     @property
     def area(self) -> float:
         """area -the surface area of all faces in this Shape"""
+        if self.wrapped is None:
+            return 0.0
         properties = GProp_GProps()
         BRepGProp.SurfaceProperties_s(self.wrapped, properties)
 
@@ -2687,11 +2703,15 @@ class Shape(NodeMixin):
         Returns:
             Shape: copy of transformed Shape
         """
+        if self.wrapped is None:
+            return self
         shape_copy: Shape = copy.deepcopy(self, None)
         transformed_shape = BRepBuilderAPI_Transform(
-            shape_copy.wrapped, transformation, True
+            self.wrapped,
+            transformation,
+            True,
         ).Shape()
-        shape_copy.wrapped = downcast(transformed_shape)
+        shape_copy.wrapped = tcast(TOPODS, downcast(transformed_shape))
         return shape_copy
 
     def rotate(self, axis: Axis, angle: float) -> Self:
@@ -2770,17 +2790,12 @@ class Shape(NodeMixin):
         Changes to the CAD structure of the base object will be reflected in all instances.
         """
         reference = copy.deepcopy(self)
-        reference.wrapped.TShape(self.wrapped.TShape())
+        if self.wrapped is not None:
+            assert (
+                reference.wrapped is not None
+            )  # Ensure mypy knows reference.wrapped is not None
+            reference.wrapped.TShape(self.wrapped.TShape())
         return reference
-
-    def copy(self) -> Self:
-        """Here for backwards compatibility with cq-editor"""
-        warnings.warn(
-            "copy() will be deprecated - use copy.copy() or copy.deepcopy() instead",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return copy.deepcopy(self, None)
 
     def transform_shape(self, t_matrix: Matrix) -> Self:
         """Apply affine transform without changing type
@@ -2795,11 +2810,13 @@ class Shape(NodeMixin):
         Returns:
             Shape: copy of transformed shape with all objects keeping their type
         """
+        new_shape = copy.deepcopy(self, None)
+        if self.wrapped is None:
+            return new_shape
         transformed = downcast(
             BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
         )
-        new_shape = copy.deepcopy(self, None)
-        new_shape.wrapped = transformed
+        new_shape.wrapped = tcast(TOPODS, transformed)
 
         return new_shape
 
@@ -2820,11 +2837,13 @@ class Shape(NodeMixin):
         Returns:
             Shape: a copy of the object, but with geometry transformed
         """
+        new_shape = copy.deepcopy(self, None)
+        if self.wrapped is None:
+            return new_shape
         transformed = downcast(
             BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True).Shape()
         )
-        new_shape = copy.deepcopy(self, None)
-        new_shape.wrapped = transformed
+        new_shape.wrapped = tcast(TOPODS, transformed)
 
         return new_shape
 
@@ -2837,7 +2856,10 @@ class Shape(NodeMixin):
         Returns:
 
         """
-
+        if self.wrapped is None:
+            raise ValueError("Cannot locate an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot locate a shape at an empty location")
         self.wrapped.Location(loc.wrapped)
 
         return self
@@ -2853,8 +2875,12 @@ class Shape(NodeMixin):
         Returns:
             Shape: copy of Shape at location
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot locate an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot locate a shape at an empty location")
         shape_copy: Shape = copy.deepcopy(self, None)
-        shape_copy.wrapped.Location(loc.wrapped)
+        shape_copy.wrapped.Location(loc.wrapped)  # type: ignore
         return shape_copy
 
     def move(self, loc: Location) -> Self:
@@ -2866,6 +2892,10 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot move an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot move a shape at an empty location")
 
         self.wrapped.Move(loc.wrapped)
 
@@ -2882,8 +2912,12 @@ class Shape(NodeMixin):
         Returns:
             Shape: copy of Shape moved to relative location
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot move an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot move a shape at an empty location")
         shape_copy: Shape = copy.deepcopy(self, None)
-        shape_copy.wrapped = downcast(shape_copy.wrapped.Moved(loc.wrapped))
+        shape_copy.wrapped = tcast(TOPODS, downcast(self.wrapped.Moved(loc.wrapped)))
         return shape_copy
 
     def relocate(self, loc: Location):
@@ -2892,9 +2926,14 @@ class Shape(NodeMixin):
         Args:
             loc (Location): new location to set for self
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot relocate an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot relocate a shape at an empty location")
+
         if self.location != loc:
             old_ax = gp_Ax3()
-            old_ax.Transform(self.location.wrapped.Transformation())
+            old_ax.Transform(self.location.wrapped.Transformation())  # type: ignore
 
             new_ax = gp_Ax3()
             new_ax.Transform(loc.wrapped.Transformation())
@@ -2903,21 +2942,23 @@ class Shape(NodeMixin):
             trsf.SetDisplacement(new_ax, old_ax)
             builder = BRepBuilderAPI_Transform(self.wrapped, trsf, True, True)
 
-            self.wrapped = downcast(builder.Shape())
+            self.wrapped = tcast(TOPODS, downcast(builder.Shape()))
             self.wrapped.Location(loc.wrapped)
 
     def distance_to_with_closest_points(
         self, other: Union[Shape, VectorLike]
     ) -> tuple[float, Vector, Vector]:
         """Minimal distance between two shapes and the points on each shape"""
+        if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
+            raise ValueError("Cannot calculate distance to or from an empty shape")
 
         if isinstance(other, Shape):
-            topods_shape = other.wrapped
+            topods_shape = tcast(TopoDS_Shape, other.wrapped)
         else:
             vec = Vector(other)
-            topods_shape = downcast(
-                BRepBuilderAPI_MakeVertex(gp_Pnt(vec.X, vec.Y, vec.Z)).Vertex()
-            )
+            topods_shape = BRepBuilderAPI_MakeVertex(
+                gp_Pnt(vec.X, vec.Y, vec.Z)
+            ).Vertex()
 
         dist_calc = BRepExtrema_DistShapeShape()
         dist_calc.LoadS1(self.wrapped)
@@ -2935,7 +2976,7 @@ class Shape(NodeMixin):
 
     def closest_points(self, other: Union[Shape, VectorLike]) -> tuple[Vector, Vector]:
         """Points on two shapes where the distance between them is minimal"""
-        return tuple(self.distance_to_with_closest_points(other)[1:])
+        return self.distance_to_with_closest_points(other)[1:3]
 
     def __hash__(self) -> int:
         """Return has code"""
@@ -2967,11 +3008,13 @@ class Shape(NodeMixin):
 
         arg = TopTools_ListOfShape()
         for obj in args:
-            arg.Append(obj.wrapped)
+            if obj.wrapped is not None:
+                arg.Append(obj.wrapped)
 
         tool = TopTools_ListOfShape()
         for obj in tools:
-            tool.Append(obj.wrapped)
+            if obj.wrapped is not None:
+                tool.Append(obj.wrapped)
 
         operation.SetArguments(arg)
         operation.SetTools(tool)
@@ -3025,7 +3068,7 @@ class Shape(NodeMixin):
         return self._bool_op((self,), to_cut, cut_op)
 
     def fuse(
-        self, *to_fuse: Shape, glue: bool = False, tol: float = None
+        self, *to_fuse: Shape, glue: bool = False, tol: float | None = None
     ) -> Self | ShapeList[Self]:
         """fuse
 
@@ -3099,7 +3142,9 @@ class Shape(NodeMixin):
             elif isinstance(obj, Plane):
                 objs.append(_to_face(obj))
             elif isinstance(obj, Location):
-                objs.append(_to_vertex(obj.position))
+                if obj.wrapped is None:
+                    raise ValueError("Cannot intersect with an empty location")
+                objs.append(_to_vertex(tcast(Vector, obj.position)))
             else:
                 objs.append(obj)
 
@@ -3108,6 +3153,31 @@ class Shape(NodeMixin):
         shape_intersections = self._bool_op((self,), objs, intersect_op)
 
         return shape_intersections
+
+    @classmethod
+    @abstractmethod
+    def extrude(
+        cls, obj: Shape, direction: VectorLike
+    ) -> Edge | Face | Shell | Solid | Compound:
+        """extrude
+
+        Extrude a Shape in the provided direction.
+        * Vertices generate Edges
+        * Edges generate Faces
+        * Wires generate Shells
+        * Faces generate Solids
+        * Shells generate Compounds
+
+        Args:
+            direction (VectorLike): direction and magnitude of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Edge | Face | Shell | Solid | Compound: extruded shape
+        """
 
     def _ocp_section(
         self: Shape, other: Union[Vertex, Edge, Wire, Face]
@@ -3131,6 +3201,9 @@ class Shape(NodeMixin):
         Returns:
             tuple[list[Vertex], list[Edge]]: section results
         """
+        if self.wrapped is None or other.wrapped is None:
+            return ([], [])
+
         try:
             section = BRepAlgoAPI_Section(other.geom_adaptor(), self.wrapped)
         except (TypeError, AttributeError):
@@ -3175,11 +3248,13 @@ class Shape(NodeMixin):
         Returns:
             list[Face]: A list of intersected faces sorted by distance from axis.position
         """
+        if self.wrapped is None:
+            return ShapeList()
+
         line = gce_MakeLin(axis.wrapped).Value()
-        shape = self.wrapped
 
         intersect_maker = BRepIntCurveSurface_Inter()
-        intersect_maker.Init(shape, line, tol)
+        intersect_maker.Init(self.wrapped, line, tol)
 
         faces_dist = []  # using a list instead of a dictionary to be able to sort it
         while intersect_maker.More():
@@ -3281,6 +3356,9 @@ class Shape(NodeMixin):
                 "keep must be one of Keep.INSIDE, Keep.OUTSIDE, or Keep.BOTH"
             )
 
+        if self.wrapped is None:
+            raise ValueError("Cannot split an empty shape")
+
         # Process the perimeter
         if not perimeter.is_closed:
             raise ValueError("perimeter must be a closed Wire or Edge")
@@ -3324,6 +3402,8 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if self.wrapped is None or other.wrapped is None:
+            raise ValueError("Cannot calculate distance to or from an empty shape")
 
         return BRepExtrema_DistShapeShape(self.wrapped, other.wrapped).Value()
 
@@ -3336,11 +3416,15 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot calculate distance to or from an empty shape")
 
         dist_calc = BRepExtrema_DistShapeShape()
         dist_calc.LoadS1(self.wrapped)
 
         for other_shape in others:
+            if other_shape.wrapped is None:
+                raise ValueError("Cannot calculate distance to or from an empty shape")
             dist_calc.LoadS2(other_shape.wrapped)
             dist_calc.Perform()
 
@@ -3356,6 +3440,8 @@ class Shape(NodeMixin):
         Returns:
 
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot mesh an empty shape")
 
         if not BRepTools.Triangulation_s(self.wrapped, tolerance):
             BRepMesh_IncrementalMesh(
@@ -3366,6 +3452,9 @@ class Shape(NodeMixin):
         self, tolerance: float, angular_tolerance: float = 0.1
     ) -> Tuple[list[Vector], list[Tuple[int, int, int]]]:
         """General triangulated approximation"""
+        if self.wrapped is None:
+            raise ValueError("Cannot tessellate an empty shape")
+
         self.mesh(tolerance, angular_tolerance)
 
         vertices: list[Vector] = []
@@ -3373,6 +3462,7 @@ class Shape(NodeMixin):
         offset = 0
 
         for face in self.faces():
+            assert face.wrapped is not None
             loc = TopLoc_Location()
             poly = BRep_Tool.Triangulation_s(face.wrapped, loc)
             trsf = loc.Transformation()
@@ -3409,7 +3499,7 @@ class Shape(NodeMixin):
 
     def to_splines(
         self, degree: int = 3, tolerance: float = 1e-3, nurbs: bool = False
-    ) -> T:
+    ) -> Self:
         """to_splines
 
         Approximate shape with b-splines of the specified degree.
@@ -3420,8 +3510,11 @@ class Shape(NodeMixin):
             nurbs (bool, optional): Use rational splines. Defaults to False.
 
         Returns:
-            T: _description_
+            Self: Approximated shape
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot approximate an empty shape")
+
         params = ShapeCustom_RestrictionParameters()
 
         result = ShapeCustom.BSplineRestriction_s(
@@ -3441,8 +3534,8 @@ class Shape(NodeMixin):
 
     def to_vtk_poly_data(
         self,
-        tolerance: float = None,
-        angular_tolerance: float = None,
+        tolerance: float | None = None,
+        angular_tolerance: float | None = None,
         normals: bool = False,
     ) -> vtkPolyData:
         """Convert shape to vtkPolyData
@@ -3454,6 +3547,9 @@ class Shape(NodeMixin):
 
         Returns: data object in VTK consisting of points, vertices, lines, and polygons
         """
+        if self.wrapped is None:
+            raise ValueError("Cannot convert an empty shape")
+
         vtk_shape = IVtkOCC_Shape(self.wrapped)
         shape_data = IVtkVTK_ShapeData()
         shape_mesher = IVtkOCC_ShapeMesher()
@@ -3492,25 +3588,12 @@ class Shape(NodeMixin):
 
         return return_value
 
-    def to_arcs(self, tolerance: float = 1e-3) -> Face:
-        """to_arcs
+    def _repr_javascript_(self):
+        """Jupyter 3D representation support"""
 
-        Approximate planar face with arcs and straight line segments.
+        from .jupyter_tools import display
 
-        Args:
-            tolerance (float, optional): Approximation tolerance. Defaults to 1e-3.
-
-        Returns:
-            Face: approximated face
-        """
-        return self.__class__(BRepAlgo.ConvertFace_s(self.wrapped, tolerance))
-
-    # def _repr_javascript_(self):
-    #     """Jupyter 3D representation support"""
-
-    #     from .jupyter_tools import display
-
-    #     return display(self)._repr_javascript_()
+        return display(self)._repr_javascript_()
 
     def transformed(
         self, rotate: VectorLike = (0, 0, 0), offset: VectorLike = (0, 0, 0)
@@ -3552,11 +3635,12 @@ class Shape(NodeMixin):
         Returns:
             list[tuple[Vector, Vector]]: Point and normal of intersection
         """
-        oc_shape = self.wrapped
+        if self.wrapped is None:
+            return []
 
         intersection_line = gce_MakeLin(other.wrapped).Value()
         intersect_maker = BRepIntCurveSurface_Inter()
-        intersect_maker.Init(oc_shape, intersection_line, 0.0001)
+        intersect_maker.Init(self.wrapped, intersection_line, 0.0001)
 
         intersections = []
         while intersect_maker.More():
@@ -3576,7 +3660,7 @@ class Shape(NodeMixin):
         intersecting_faces = [i[0] for i in intersections]
         intersecting_points = [i[1] for i in intersections]
         intersecting_normals = [
-            f.normal_at(intersecting_points[i].to_pnt())
+            _topods_face_normal_at(f, intersecting_points[i].to_pnt())
             for i, f in enumerate(intersecting_faces)
         ]
         result = []
@@ -3657,7 +3741,7 @@ class Shape(NodeMixin):
         return ShapeList(projected_faces)
 
 
-class Comparable(metaclass=ABCMeta):
+class Comparable(ABC):
     """Abstract base class that requires comparison methods"""
 
     @abstractmethod
@@ -3695,7 +3779,11 @@ class ShapeList(list[T]):
 
     def center(self) -> Vector:
         """The average of the center of objects within the ShapeList"""
-        return sum(o.center() for o in self) / len(self) if self else Vector(0, 0, 0)
+        if not self:
+            return Vector(0, 0, 0)
+
+        total_center = sum((o.center() for o in self), Vector(0, 0, 0))
+        return total_center / len(self)
 
     def filter_by(
         self,
@@ -3729,12 +3817,17 @@ class ShapeList(list[T]):
         def axis_parallel_predicate(axis: Axis, tolerance: float):
             def pred(shape: Shape):
                 if shape.is_planar_face:
+                    assert shape.wrapped is not None and isinstance(shape, Face)
                     gp_pnt = gp_Pnt()
-                    normal = gp_Vec()
+                    surface_normal = gp_Vec()
                     u_val, _, v_val, _ = BRepTools.UVBounds_s(shape.wrapped)
-                    BRepGProp_Face(shape.wrapped).Normal(u_val, v_val, gp_pnt, normal)
-                    normal = Vector(normal).normalized()
-                    shape_axis = Axis(shape.center(), normal)
+                    BRepGProp_Face(shape.wrapped).Normal(
+                        u_val, v_val, gp_pnt, surface_normal
+                    )
+                    normalized_surface_normal = Vector(
+                        surface_normal.X(), surface_normal.Y(), surface_normal.Z()
+                    ).normalized()
+                    shape_axis = Axis(shape.center(), normalized_surface_normal)
                 elif (
                     isinstance(shape.wrapped, TopoDS_Edge)
                     and shape.geom_type == GeomType.LINE
@@ -3759,13 +3852,15 @@ class ShapeList(list[T]):
 
             def pred(shape: Shape):
                 if shape.is_planar_face:
-                    gp_pnt = gp_Pnt()
-                    normal = gp_Vec()
+                    assert shape.wrapped is not None and isinstance(shape, Face)
+                    gp_pnt: gp_Pnt = gp_Pnt()
+                    surface_normal: gp_Vec = gp_Vec()
                     u_val, _, v_val, _ = BRepTools.UVBounds_s(shape.wrapped)
-                    BRepGProp_Face(shape.wrapped).Normal(u_val, v_val, gp_pnt, normal)
-                    normal = Vector(normal).normalized()
-                    shape_axis = Axis(shape.center(), normal)
-                    # shape_axis = Axis(shape.center(), shape.normal_at(None))
+                    BRepGProp_Face(shape.wrapped).Normal(
+                        u_val, v_val, gp_pnt, surface_normal
+                    )
+                    normalized_surface_normal = Vector(surface_normal).normalized()
+                    shape_axis = Axis(shape.center(), normalized_surface_normal)
                     return plane_axis.is_parallel(shape_axis, tolerance)
                 if isinstance(shape.wrapped, TopoDS_Wire):
                     return all(pred(e) for e in shape.edges())
@@ -3881,6 +3976,9 @@ class ShapeList(list[T]):
         """
 
         if isinstance(group_by, Axis):
+            if group_by.wrapped is None:
+                raise ValueError("Cannot group by an empty axis")
+            assert group_by.location is not None
             axis_as_location = group_by.location.inverse()
 
             def key_f(obj):
@@ -3892,6 +3990,8 @@ class ShapeList(list[T]):
         elif hasattr(group_by, "wrapped") and isinstance(
             group_by.wrapped, (TopoDS_Edge, TopoDS_Wire)
         ):
+            if group_by.wrapped is None:
+                raise ValueError("Cannot group by an empty Edge or Wire")
 
             def key_f(obj):
                 pnt1, _pnt2 = group_by.closest_points(obj.center())
@@ -3946,7 +4046,11 @@ class ShapeList(list[T]):
         Returns:
             ShapeList: sorted list of objects
         """
+
         if isinstance(sort_by, Axis):
+            if sort_by.wrapped is None:
+                raise ValueError("Cannot sort by an empty axis")
+            assert sort_by.location is not None
             axis_as_location = sort_by.location.inverse()
             objects = sorted(
                 self,
@@ -3956,9 +4060,12 @@ class ShapeList(list[T]):
         elif hasattr(sort_by, "wrapped") and isinstance(
             sort_by.wrapped, (TopoDS_Edge, TopoDS_Wire)
         ):
+            if sort_by.wrapped is None:
+                raise ValueError("Cannot sort by an empty Edge or Wire")
 
             def u_of_closest_center(obj) -> float:
                 """u-value of closest point between object center and sort_by"""
+                assert not isinstance(sort_by, SortBy)
                 pnt1, _pnt2 = sort_by.closest_points(obj.center())
                 return sort_by.param_at_point(pnt1)
 
@@ -3975,9 +4082,10 @@ class ShapeList(list[T]):
                     reverse=reverse,
                 )
             elif sort_by == SortBy.RADIUS:
+                with_radius = [obj for obj in self if hasattr(obj, "radius")]
                 objects = sorted(
-                    self,
-                    key=lambda obj: obj.radius,
+                    with_radius,
+                    key=lambda obj: obj.radius,  # type: ignore
                     reverse=reverse,
                 )
             elif sort_by == SortBy.DISTANCE:
@@ -3987,15 +4095,17 @@ class ShapeList(list[T]):
                     reverse=reverse,
                 )
             elif sort_by == SortBy.AREA:
+                with_area = [obj for obj in self if hasattr(obj, "area")]
                 objects = sorted(
-                    self,
-                    key=lambda obj: obj.area,
+                    with_area,
+                    key=lambda obj: obj.area,  # type: ignore
                     reverse=reverse,
                 )
             elif sort_by == SortBy.VOLUME:
+                with_volume = [obj for obj in self if hasattr(obj, "volume")]
                 objects = sorted(
-                    self,
-                    key=lambda obj: obj.volume,
+                    with_volume,
+                    key=lambda obj: obj.volume,  # type: ignore
                     reverse=reverse,
                 )
 
@@ -4016,7 +4126,7 @@ class ShapeList(list[T]):
             ShapeList: Sorted shapes
         """
         distances = sorted(
-            [(obj.distance_to(other), obj) for obj in self],
+            [(obj.distance_to(other), obj) for obj in self],  # type: ignore
             key=lambda obj: obj[0],
             reverse=reverse,
         )
@@ -4024,7 +4134,7 @@ class ShapeList(list[T]):
 
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this ShapeList"""
-        return ShapeList([v for shape in self for v in shape.vertices()])
+        return ShapeList([v for shape in self for v in shape.vertices()])  # type: ignore
 
     def vertex(self) -> Vertex:
         """Return the Vertex"""
@@ -4038,7 +4148,7 @@ class ShapeList(list[T]):
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this ShapeList"""
-        return ShapeList([e for shape in self for e in shape.edges()])
+        return ShapeList([e for shape in self for e in shape.edges()])  # type: ignore
 
     def edge(self) -> Edge:
         """Return the Edge"""
@@ -4050,7 +4160,7 @@ class ShapeList(list[T]):
 
     def wires(self) -> ShapeList[Wire]:
         """wires - all the wires in this ShapeList"""
-        return ShapeList([w for shape in self for w in shape.wires()])
+        return ShapeList([w for shape in self for w in shape.wires()])  # type: ignore
 
     def wire(self) -> Wire:
         """Return the Wire"""
@@ -4062,7 +4172,7 @@ class ShapeList(list[T]):
 
     def faces(self) -> ShapeList[Face]:
         """faces - all the faces in this ShapeList"""
-        return ShapeList([f for shape in self for f in shape.faces()])
+        return ShapeList([f for shape in self for f in shape.faces()])  # type: ignore
 
     def face(self) -> Face:
         """Return the Face"""
@@ -4075,7 +4185,7 @@ class ShapeList(list[T]):
 
     def shells(self) -> ShapeList[Shell]:
         """shells - all the shells in this ShapeList"""
-        return ShapeList([s for shape in self for s in shape.shells()])
+        return ShapeList([s for shape in self for s in shape.shells()])  # type: ignore
 
     def shell(self) -> Shell:
         """Return the Shell"""
@@ -4087,7 +4197,7 @@ class ShapeList(list[T]):
 
     def solids(self) -> ShapeList[Solid]:
         """solids - all the solids in this ShapeList"""
-        return ShapeList([s for shape in self for s in shape.solids()])
+        return ShapeList([s for shape in self for s in shape.solids()])  # type: ignore
 
     def solid(self) -> Solid:
         """Return the Solid"""
@@ -4099,7 +4209,7 @@ class ShapeList(list[T]):
 
     def compounds(self) -> ShapeList[Compound]:
         """compounds - all the compounds in this ShapeList"""
-        return ShapeList([c for shape in self for c in shape.compounds()])
+        return ShapeList([c for shape in self for c in shape.compounds()])  # type: ignore
 
     def compound(self) -> Compound:
         """Return the Compound"""
@@ -4111,68 +4221,63 @@ class ShapeList(list[T]):
             )
         return compounds[0]
 
-    def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+    def __gt__(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList[T]:  # type: ignore
         """Sort operator >"""
         return self.sort_by(sort_by)
 
-    def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z):
+    def __lt__(self, sort_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList[T]:  # type: ignore
         """Reverse sort operator <"""
         return self.sort_by(sort_by, reverse=True)
 
-    def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
+    def __rshift__(self, group_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList[T]:
         """Group and select largest group operator >>"""
         return self.group_by(group_by)[-1]
 
-    def __lshift__(self, group_by: Union[Axis, SortBy] = Axis.Z):
+    def __lshift__(self, group_by: Union[Axis, SortBy] = Axis.Z) -> ShapeList[T]:
         """Group and select smallest group operator <<"""
         return self.group_by(group_by)[0]
 
-    def __or__(self, filter_by: Union[Axis, GeomType] = Axis.Z):
+    def __or__(self, filter_by: Union[Axis, GeomType] = Axis.Z) -> ShapeList[T]:
         """Filter by axis or geomtype operator |"""
         return self.filter_by(filter_by)
 
-    def __eq__(self, other: object):
+    def __eq__(self, other: object) -> bool:
         """ShapeLists equality operator =="""
         return (
-            set(self) == set(other) if isinstance(other, ShapeList) else NotImplemented
+            set(self) == set(other) if isinstance(other, ShapeList) else NotImplemented  # type: ignore
         )
 
     # Normally implementing __eq__ is enough, but ShapeList subclasses list,
     # which already implements __ne__, so we need to override it, too
-    def __ne__(self, other: ShapeList):
+    def __ne__(self, other: ShapeList) -> bool:  # type: ignore
         """ShapeLists inequality operator !="""
         return (
             set(self) != set(other) if isinstance(other, ShapeList) else NotImplemented
         )
 
-    def __add__(self, other: ShapeList):
+    def __add__(self, other: ShapeList) -> ShapeList[T]:  # type: ignore
         """Combine two ShapeLists together operator +"""
         return ShapeList(list(self) + list(other))
 
-    def __sub__(self, other: ShapeList) -> ShapeList:
+    def __sub__(self, other: ShapeList) -> ShapeList[T]:
         """Differences between two ShapeLists operator -"""
-        # hash_other = [hash(o) for o in other]
-        # hash_set = {hash(o): o for o in self if hash(o) not in hash_other}
-        # return ShapeList(hash_set.values())
         return ShapeList(set(self) - set(other))
 
-    def __and__(self, other: ShapeList):
+    def __and__(self, other: ShapeList) -> ShapeList[T]:
         """Intersect two ShapeLists operator &"""
         return ShapeList(set(self) & set(other))
 
     @overload
-    def __getitem__(self, key: int) -> T: ...
+    def __getitem__(self, key: SupportsIndex) -> T: ...
 
     @overload
     def __getitem__(self, key: slice) -> ShapeList[T]: ...
 
-    def __getitem__(self, key: Union[int, slice]) -> Union[T, ShapeList[T]]:
+    def __getitem__(self, key: Union[SupportsIndex, slice]) -> Union[T, ShapeList[T]]:
         """Return slices of ShapeList as ShapeList"""
         if isinstance(key, slice):
-            return_value = ShapeList(list(self).__getitem__(key))
-        else:
-            return_value = list(self).__getitem__(key)
-        return return_value
+            return ShapeList(list(self).__getitem__(key))
+        return list(self).__getitem__(key)
 
 
 class GroupBy(Generic[T, K]):
@@ -4243,7 +4348,7 @@ class GroupBy(Generic[T, K]):
         return self.group(self.key_f(shape))
 
 
-class Compound(Mixin3D, Shape):
+class Compound(Mixin3D, Shape[TopoDS_Compound]):
     """A Compound in build123d is a topological entity representing a collection of
     geometric shapes grouped together within a single structure. It serves as a
     container for organizing diverse shapes like edges, faces, or solids. This
@@ -4256,7 +4361,6 @@ class Compound(Mixin3D, Shape):
     order = 4.0
 
     project_to_viewport = Mixin1D.project_to_viewport
-    extrude = _ClassMethodProxy(Mixin1D.extrude)
 
     @classmethod
     def cast(cls, obj: TopoDS_Shape) -> Self:
@@ -4280,18 +4384,17 @@ class Compound(Mixin3D, Shape):
     @property
     def _dim(self) -> Union[int, None]:
         """The dimension of the shapes within the Compound - None if inconsistent"""
-        sub_dims = {s.dim for s in get_top_level_topods_shapes(self.wrapped)}
-        return sub_dims.pop() if len(sub_dims) == 1 else None
+        return topods_dim(self.wrapped)
 
     def __init__(
         self,
         obj: Optional[TopoDS_Compound | Iterable[Shape]] = None,
         label: str = "",
-        color: Color = None,
+        color: Color | None = None,
         material: str = "",
-        joints: dict[str, Joint] = None,
-        parent: Compound = None,
-        children: Sequence[Shape] = None,
+        joints: dict[str, Joint] | None = None,
+        parent: Compound | None = None,
+        children: Sequence[Shape] | None = None,
     ):
         """Build a Compound from Shapes
 
@@ -4505,6 +4608,26 @@ class Compound(Mixin3D, Shape):
             )
         return shape_list[0] if shape_list else None
 
+    @classmethod
+    def extrude(cls, obj: Shell, direction: VectorLike) -> Compound:
+        """extrude
+
+        Extrude a Shell into a Compound.
+
+        Args:
+            direction (VectorLike): direction and magnitude of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Edge: extruded shape
+        """
+        return Compound(
+            TopoDS.Compound_s(_extrude_topods_shape(obj.wrapped, direction))
+        )
+
     def do_children_intersect(
         self, include_parent: bool = False, tolerance: float = 1e-5
     ) -> tuple[bool, tuple[Shape, Shape], float]:
@@ -4569,7 +4692,7 @@ class Compound(Mixin3D, Shape):
         font_style: FontStyle = FontStyle.REGULAR,
         align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
         position_on_path: float = 0.0,
-        text_path: Union[Edge, Wire] = None,
+        text_path: Union[Edge, Wire, None] = None,
     ) -> "Compound":
         """2D Text that optionally follows a path.
 
@@ -4866,7 +4989,7 @@ class Curve(Compound):
         return Wire.combine(self.edges())
 
 
-class Edge(Mixin1D, Shape):
+class Edge(Mixin1D, Shape[TopoDS_Edge]):
     """An Edge in build123d is a fundamental element in the topological data structure
     representing a one-dimensional geometric entity within a 3D model. It encapsulates
     information about a curve, which could be a line, arc, or other parametrically
@@ -4885,15 +5008,15 @@ class Edge(Mixin1D, Shape):
 
     def __init__(
         self,
-        obj: Optional[TopoDS_Shape | Axis] = None,
+        obj: Optional[TopoDS_Edge | Axis | None] = None,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build an Edge from an OCCT TopoDS_Shape/TopoDS_Edge
 
         Args:
-            obj (TopoDS_Shape | Axis, optional): OCCT Edge or Axis.
+            obj (TopoDS_Edge | Axis, optional): OCCT Edge or Axis.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
@@ -5021,7 +5144,7 @@ class Edge(Mixin1D, Shape):
         return vertex_intersections, edge_intersections
 
     def find_intersection_points(
-        self, other: Axis | Edge = None, tolerance: float = TOLERANCE
+        self, other: Axis | Edge | None = None, tolerance: float = TOLERANCE
     ) -> ShapeList[Vector]:
         """find_intersection_points
 
@@ -5137,6 +5260,24 @@ class Edge(Mixin1D, Shape):
                 return common_edges[0]
             return ShapeList(common_vertices + common_edges)
         return None
+
+    @classmethod
+    def extrude(cls, obj: Vertex, direction: VectorLike) -> Edge:
+        """extrude
+
+        Extrude a Vertex into an Edge.
+
+        Args:
+            direction (VectorLike): direction and magnitude of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Edge: extruded shape
+        """
+        return Edge(TopoDS.Edge_s(_extrude_topods_shape(obj.wrapped, direction)))
 
     def reversed(self) -> Edge:
         """Return a copy of self with the opposite orientation"""
@@ -5254,7 +5395,9 @@ class Edge(Mixin1D, Shape):
         return u_value
 
     @classmethod
-    def make_bezier(cls, *cntl_pnts: VectorLike, weights: list[float] = None) -> Edge:
+    def make_bezier(
+        cls, *cntl_pnts: VectorLike, weights: list[float] | None = None
+    ) -> Edge:
         """make_bezier
 
         Create a rational (with weights) or non-rational bezier curve.  The first and last
@@ -5422,9 +5565,9 @@ class Edge(Mixin1D, Shape):
     def make_spline(
         cls,
         points: list[VectorLike],
-        tangents: list[VectorLike] = None,
+        tangents: list[VectorLike] | None = None,
         periodic: bool = False,
-        parameters: list[float] = None,
+        parameters: list[float] | None = None,
         scale: bool = True,
         tol: float = 1e-6,
     ) -> Edge:
@@ -5518,7 +5661,7 @@ class Edge(Mixin1D, Shape):
         cls,
         points: list[VectorLike],
         tol: float = 1e-3,
-        smoothing: Tuple[float, float, float] = None,
+        smoothing: Tuple[float, float, float] | None = None,
         min_deg: int = 1,
         max_deg: int = 6,
     ) -> Edge:
@@ -5728,8 +5871,8 @@ class Edge(Mixin1D, Shape):
     def project_to_shape(
         self,
         target_object: Shape,
-        direction: VectorLike = None,
-        center: VectorLike = None,
+        direction: VectorLike | None = None,
+        center: VectorLike | None = None,
     ) -> list[Edge]:
         """Project Edge
 
@@ -5770,7 +5913,7 @@ class Edge(Mixin1D, Shape):
         return Axis(self.position_at(0), self.position_at(1) - self.position_at(0))
 
 
-class Face(Mixin2D, Shape):
+class Face(Mixin2D, Shape[TopoDS_Face]):
     """A Face in build123d represents a 3D bounded surface within the topological data
     structure. It encapsulates geometric information, defining a face of a 3D shape.
     These faces are integral components of complex structures, such as solids and
@@ -5788,10 +5931,10 @@ class Face(Mixin2D, Shape):
     @overload
     def __init__(
         self,
-        obj: TopoDS_Shape,
+        obj: TopoDS_Face,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build a Face from an OCCT TopoDS_Shape/TopoDS_Face
 
@@ -5806,10 +5949,10 @@ class Face(Mixin2D, Shape):
     def __init__(
         self,
         outer_wire: Wire,
-        inner_wires: Iterable[Wire] = None,
+        inner_wires: Iterable[Wire] | None = None,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build a planar Face from a boundary Wire with optional hole Wires.
 
@@ -5868,7 +6011,7 @@ class Face(Mixin2D, Shape):
             parent=parent,
         )
         # Faces can optionally record the plane it was created on for later extrusion
-        self.created_on: Plane = None
+        self.created_on: Plane | None = None
 
     @property
     def length(self) -> float:
@@ -5946,7 +6089,7 @@ class Face(Mixin2D, Shape):
         return BRepTools.UVBounds_s(self.wrapped)
 
     @overload
-    def normal_at(self, surface_point: VectorLike = None) -> Vector:
+    def normal_at(self, surface_point: VectorLike | None = None) -> Vector:
         """normal_at point on surface
 
         Args:
@@ -6056,7 +6199,9 @@ class Face(Mixin2D, Shape):
 
         return Vector(gp_pnt)
 
-    def location_at(self, u: float, v: float, x_dir: VectorLike = None) -> Location:
+    def location_at(
+        self, u: float, v: float, x_dir: VectorLike | None = None
+    ) -> Location:
         """Location at the u/v position of face"""
         origin = self.position_at(u, v)
         if x_dir is None:
@@ -6115,6 +6260,24 @@ class Face(Mixin2D, Shape):
                 stacklevel=2,
             )
         return self.outer_wire()
+
+    @classmethod
+    def extrude(cls, obj: Edge, direction: VectorLike) -> Face:
+        """extrude
+
+        Extrude an Edge into a Face.
+
+        Args:
+            direction (VectorLike): direction and magnitude of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Face: extruded shape
+        """
+        return Face(TopoDS.Face_s(_extrude_topods_shape(obj.wrapped, direction)))
 
     @classmethod
     def make_rect(cls, width: float, height: float, plane: Plane = Plane.XY) -> Face:
@@ -6268,7 +6431,7 @@ class Face(Mixin2D, Shape):
         cls,
         points: list[list[VectorLike]],
         tol: float = 1e-2,
-        smoothing: Tuple[float, float, float] = None,
+        smoothing: Tuple[float, float, float] | None = None,
         min_deg: int = 1,
         max_deg: int = 3,
     ) -> Face:
@@ -6322,7 +6485,7 @@ class Face(Mixin2D, Shape):
     def make_bezier_surface(
         cls,
         points: list[list[VectorLike]],
-        weights: list[list[float]] = None,
+        weights: list[list[float]] | None = None,
     ) -> Face:
         """make_bezier_surface
 
@@ -6371,8 +6534,8 @@ class Face(Mixin2D, Shape):
     def make_surface(
         cls,
         exterior: Union[Wire, Iterable[Edge]],
-        surface_points: Iterable[VectorLike] = None,
-        interior_wires: Iterable[Wire] = None,
+        surface_points: Iterable[VectorLike] | None = None,
+        interior_wires: Iterable[Wire] | None = None,
     ) -> Face:
         """Create Non-Planar Face
 
@@ -6500,7 +6663,7 @@ class Face(Mixin2D, Shape):
         distance: float,
         distance2: float,
         vertices: Iterable[Vertex],
-        edge: Edge = None,
+        edge: Edge | None = None,
     ) -> Face:
         """Apply 2D chamfer to a face
 
@@ -6520,7 +6683,6 @@ class Face(Mixin2D, Shape):
 
         """
         reference_edge = edge
-        del edge
 
         chamfer_builder = BRepFilletAPI_MakeFillet2d(self.wrapped)
 
@@ -6685,8 +6847,24 @@ class Face(Mixin2D, Shape):
         # projector = GeomAPI_ProjectPointOnSurf(Vector(point).to_pnt(), surface)
         # return projector.LowerDistance() <= TOLERANCE
 
+    def to_arcs(self, tolerance: float = 1e-3) -> Face:
+        """to_arcs
 
-class Shell(Mixin2D, Shape):
+        Approximate planar face with arcs and straight line segments.
+
+        Args:
+            tolerance (float, optional): Approximation tolerance. Defaults to 1e-3.
+
+        Returns:
+            Face: approximated face
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot approximate an empty shape")
+
+        return self.__class__(BRepAlgo.ConvertFace_s(self.wrapped, tolerance))
+
+
+class Shell(Mixin2D, Shape[TopoDS_Shell]):
     """A Shell is a fundamental component in build123d's topological data structure
     representing a connected set of faces forming a closed surface in 3D space. As
     part of a geometric model, it defines a watertight enclosure, commonly encountered
@@ -6703,10 +6881,10 @@ class Shell(Mixin2D, Shape):
 
     def __init__(
         self,
-        obj: Optional[TopoDS_Shape | Face | Iterable[Face]] = None,
+        obj: Optional[TopoDS_Shell | Face | Iterable[Face]] = None,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build a shell from an OCCT TopoDS_Shape/TopoDS_Shell
 
@@ -6751,6 +6929,24 @@ class Shell(Mixin2D, Shape):
         properties = GProp_GProps()
         BRepGProp.LinearProperties_s(self.wrapped, properties)
         return Vector(properties.CentreOfMass())
+
+    @classmethod
+    def extrude(cls, obj: Wire, direction: VectorLike) -> Shell:
+        """extrude
+
+        Extrude a Wire into a Shell.
+
+        Args:
+            direction (VectorLike): direction and magnitude of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Edge: extruded shape
+        """
+        return Shell(TopoDS.Shell_s(_extrude_topods_shape(obj.wrapped, direction)))
 
     @classmethod
     def sweep(
@@ -6807,7 +7003,7 @@ class Shell(Mixin2D, Shape):
         return cls(_make_loft(objs, False, ruled))
 
 
-class Solid(Mixin3D, Shape):
+class Solid(Mixin3D, Shape[TopoDS_Solid]):
     """A Solid in build123d represents a three-dimensional solid geometry
     in a topological structure. A solid is a closed and bounded volume, enclosing
     a region in 3D space. It comprises faces, edges, and vertices connected in a
@@ -6823,12 +7019,12 @@ class Solid(Mixin3D, Shape):
 
     def __init__(
         self,
-        obj: TopoDS_Shape | Shell = None,
+        obj: TopoDS_Solid | Shell | None = None,
         label: str = "",
-        color: Color = None,
+        color: Color | None = None,
         material: str = "",
-        joints: dict[str, Joint] = None,
-        parent: Compound = None,
+        joints: dict[str, Joint] | None = None,
+        parent: Compound | None = None,
     ):
         """Build a solid from an OCCT TopoDS_Shape/TopoDS_Solid
 
@@ -6864,6 +7060,24 @@ class Solid(Mixin3D, Shape):
     def _make_solid(cls, shell: Shell) -> TopoDS_Solid:
         """Create a Solid object from the surface shell"""
         return ShapeFix_Solid().SolidFromShell(shell.wrapped)
+
+    @classmethod
+    def extrude(cls, obj: Face, direction: VectorLike) -> Solid:
+        """extrude
+
+        Extrude a Face into a Solid.
+
+        Args:
+            direction (VectorLike): direction and magnitude of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Edge: extruded shape
+        """
+        return Solid(TopoDS.Solid_s(_extrude_topods_shape(obj.wrapped, direction)))
 
     @classmethod
     def from_bounding_box(cls, bbox: BoundBox) -> Solid:
@@ -7169,7 +7383,7 @@ class Solid(Mixin3D, Shape):
         center: VectorLike,
         normal: VectorLike,
         angle: float,
-        inner_wires: list[Wire] = None,
+        inner_wires: list[Wire] | None = None,
     ) -> Solid:
         """Extrude with Rotation
 
@@ -7351,7 +7565,7 @@ class Solid(Mixin3D, Shape):
         section: Union[Face, Wire],
         angle: float,
         axis: Axis,
-        inner_wires: list[Wire] = None,
+        inner_wires: list[Wire] | None = None,
     ) -> Solid:
         """Revolve
 
@@ -7407,7 +7621,7 @@ class Solid(Mixin3D, Shape):
         cls,
         section: Union[Face, Wire],
         path: Union[Wire, Edge],
-        inner_wires: list[Wire] = None,
+        inner_wires: list[Wire] | None = None,
         make_solid: bool = True,
         is_frenet: bool = False,
         mode: Union[Vector, Wire, Edge, None] = None,
@@ -7579,7 +7793,7 @@ class Solid(Mixin3D, Shape):
         return result
 
 
-class Vertex(Shape):
+class Vertex(Shape[TopoDS_Vertex]):
     """A Vertex in build123d represents a zero-dimensional point in the topological
     data structure. It marks the endpoints of edges within a 3D model, defining precise
     locations in space. Vertices play a crucial role in defining the geometry of objects
@@ -7801,8 +8015,13 @@ class Vertex(Shape):
         """
         return Vertex(*t_matrix.multiply(Vector(self)))
 
+    @classmethod
+    def extrude(cls, obj: Shape, direction: VectorLike) -> Vertex:
+        """extrude - invalid operation for Vertex"""
+        raise NotImplementedError("Vertices can't be created by extrusion")
 
-class Wire(Mixin1D, Shape):
+
+class Wire(Mixin1D, Shape[TopoDS_Wire]):
     """A Wire in build123d is a topological entity representing a connected sequence
     of edges forming a continuous curve or path in 3D space. Wires are essential
     components in modeling complex objects, defining boundaries for surfaces or
@@ -7818,15 +8037,15 @@ class Wire(Mixin1D, Shape):
     @overload
     def __init__(
         self,
-        obj: TopoDS_Shape,
+        obj: TopoDS_Wire,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build a wire from an OCCT TopoDS_Wire
 
         Args:
-            obj (TopoDS_Shape, optional): OCCT Wire.
+            obj (TopoDS_Wire, optional): OCCT Wire.
             label (str, optional): Defaults to ''.
             color (Color, optional): Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
@@ -7837,8 +8056,8 @@ class Wire(Mixin1D, Shape):
         self,
         edge: Edge,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build a Wire from an Edge
 
@@ -7854,8 +8073,8 @@ class Wire(Mixin1D, Shape):
         self,
         wire: Wire,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build a Wire from an Wire - used when the input could be an Edge or Wire.
 
@@ -7871,8 +8090,8 @@ class Wire(Mixin1D, Shape):
         self,
         wire: Curve,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build a Wire from an Curve.
 
@@ -7889,8 +8108,8 @@ class Wire(Mixin1D, Shape):
         edges: Iterable[Edge],
         sequenced: bool = False,
         label: str = "",
-        color: Color = None,
-        parent: Compound = None,
+        color: Color | None = None,
+        parent: Compound | None = None,
     ):
         """Build a wire from Edges
 
@@ -7912,7 +8131,7 @@ class Wire(Mixin1D, Shape):
 
         if args:
             l_a = len(args)
-            if isinstance(args[0], TopoDS_Shape):
+            if isinstance(args[0], TopoDS_Wire):
                 obj, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Edge):
                 edge, label, color, parent = args[:4] + (None,) * (4 - l_a)
@@ -7922,7 +8141,7 @@ class Wire(Mixin1D, Shape):
             elif (
                 hasattr(args[0], "wrapped")
                 and isinstance(args[0].wrapped, TopoDS_Compound)
-                and args[0].wrapped.dim == 1
+                and topods_dim(args[0].wrapped) == 1
             ):  # Curve
                 curve, label, color, parent = args[:4] + (None,) * (4 - l_a)
             elif isinstance(args[0], Iterable):
@@ -8019,6 +8238,11 @@ class Wire(Mixin1D, Shape):
             wires.append(Wire(downcast(wires_out.Value(i + 1))))
 
         return wires
+
+    @classmethod
+    def extrude(cls, obj: Shape, direction: VectorLike) -> Wire:
+        """extrude - invalid operation for Wire"""
+        raise NotImplementedError("Wires can't be created by extrusion")
 
     def fix_degenerate_edges(self, precision: float) -> Wire:
         """fix_degenerate_edges
@@ -8363,7 +8587,7 @@ class Wire(Mixin1D, Shape):
         distance: float,
         distance2: float,
         vertices: Iterable[Vertex],
-        edge: Edge = None,
+        edge: Edge | None = None,
     ) -> Wire:
         """chamfer_2d
 
@@ -8581,8 +8805,8 @@ class Wire(Mixin1D, Shape):
     def project_to_shape(
         self,
         target_object: Shape,
-        direction: VectorLike = None,
-        center: VectorLike = None,
+        direction: VectorLike | None = None,
+        center: VectorLike | None = None,
     ) -> list[Wire]:
         """Project Wire
 
@@ -8701,14 +8925,15 @@ class Joint(ABC):
     def __init__(self, label: str, parent: Union[Solid, Compound]):
         self.label = label
         self.parent = parent
-        self.connected_to: Joint = None
+        self.connected_to: Joint | None = None
 
     def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
         """Connect Joint self by repositioning other"""
 
         if not isinstance(other, Joint):
             raise TypeError(f"other must of type Joint not {type(other)}")
-
+        if self.parent.location is None:
+            raise ValueError("Parent location is not set")
         relative_location = self.relative_to(other, **kwargs)
         other.parent.locate(self.parent.location * relative_location)
         self.connected_to = other
@@ -8753,6 +8978,7 @@ def _make_loft(
     Returns:
         TopoDS_Shape: Lofted object
     """
+    objs = list(objs)  # To determine its length
     if len(objs) < 2:
         raise ValueError("More than one wire is required")
     vertices = [obj for obj in objs if isinstance(obj.wrapped, TopoDS_Vertex)]
@@ -8811,7 +9037,7 @@ def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
     return return_value
 
 
-def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> list[Wire]:
+def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> ShapeList[Wire]:
     """Convert edges to a list of wires.
 
     Args:
@@ -8826,12 +9052,14 @@ def edges_to_wires(edges: Iterable[Edge], tol: float = 1e-6) -> list[Wire]:
     wires_out = TopTools_HSequenceOfShape()
 
     for edge in edges:
-        edges_in.Append(edge.wrapped)
+        if edge.wrapped is not None:
+            edges_in.Append(edge.wrapped)
     ShapeAnalysis_FreeBounds.ConnectEdgesToWires_s(edges_in, tol, False, wires_out)
 
-    wires = ShapeList()
+    wires: ShapeList[Wire] = ShapeList()
     for i in range(wires_out.Length()):
-        wires.append(Wire(downcast(wires_out.Value(i + 1))))
+        # wires.append(Wire(downcast(wires_out.Value(i + 1))))
+        wires.append(Wire(TopoDS.Wire_s(wires_out.Value(i + 1))))
 
     return wires
 
@@ -8870,9 +9098,9 @@ def isclose_b(x: float, y: float, rel_tol=1e-9, abs_tol=1e-14) -> bool:
     return isclose(x, y, rel_tol=rel_tol, abs_tol=abs_tol)
 
 
-def shapetype(obj: TopoDS_Shape) -> TopAbs_ShapeEnum:
+def shapetype(obj: TopoDS_Shape | None) -> TopAbs_ShapeEnum:
     """Return TopoDS_Shape's TopAbs_ShapeEnum"""
-    if obj.IsNull():
+    if obj is None or obj.IsNull():
         raise ValueError("Null TopoDS_Shape object")
 
     return obj.ShapeType()
@@ -8968,12 +9196,14 @@ def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
     # Create a list of combined object edges
     combined_topo_edges = TopTools_ListOfShape()
     for edge in combined.edges():
-        combined_topo_edges.Append(edge.wrapped)
+        if edge.wrapped is not None:
+            combined_topo_edges.Append(edge.wrapped)
 
     # Create a list of original object edges
     original_topo_edges = TopTools_ListOfShape()
     for edge in [e for obj in objects for e in obj.edges()]:
-        original_topo_edges.Append(edge.wrapped)
+        if edge.wrapped is not None:
+            original_topo_edges.Append(edge.wrapped)
 
     # Cut the original edges from the combined edges
     operation = BRepAlgoAPI_Cut()
@@ -8993,15 +9223,21 @@ def new_edges(*objects: Shape, combined: Shape) -> ShapeList[Edge]:
     return ShapeList(edges)
 
 
-def topo_explore_connected_edges(edge: Edge, parent: Shape = None) -> ShapeList[Edge]:
+def topo_explore_connected_edges(
+    edge: Edge, parent: Shape | None = None
+) -> ShapeList[Edge]:
     """Given an edge extracted from a Shape, return the edges connected to it"""
 
     parent = parent if parent is not None else edge.topo_parent
+    if parent is None:
+        raise ValueError("edge has no valid parent")
     given_topods_edge = edge.wrapped
+    if given_topods_edge is None:
+        raise ValueError("edge is empty")
     connected_edges = set()
 
     # Find all the TopoDS_Edges for this Shape
-    topods_edges = ShapeList([e.wrapped for e in parent.edges()])
+    topods_edges = [e.wrapped for e in parent.edges() if e.wrapped is not None]
 
     for topods_edge in topods_edges:
         # # Don't match with the given edge
@@ -9011,7 +9247,7 @@ def topo_explore_connected_edges(edge: Edge, parent: Shape = None) -> ShapeList[
         if topo_explore_common_vertex(given_topods_edge, topods_edge) is not None:
             connected_edges.add(topods_edge)
 
-    return ShapeList([Edge(e) for e in connected_edges])
+    return ShapeList(Edge(e) for e in connected_edges)
 
 
 def topo_explore_common_vertex(
@@ -9020,6 +9256,9 @@ def topo_explore_common_vertex(
     """Given two edges, find the common vertex"""
     topods_edge1 = edge1 if isinstance(edge1, TopoDS_Edge) else edge1.wrapped
     topods_edge2 = edge2 if isinstance(edge2, TopoDS_Edge) else edge2.wrapped
+
+    if topods_edge1 is None or topods_edge2 is None:
+        raise ValueError("edge is empty")
 
     # Explore vertices of the first edge
     vert_exp = TopExp_Explorer(topods_edge1, ta.TopAbs_VERTEX)
@@ -9033,7 +9272,7 @@ def topo_explore_common_vertex(
 
             # Check if the vertices are the same
             if vertex1.IsSame(vertex2):
-                return Vertex(downcast(vertex1))  # Common vertex found
+                return Vertex(TopoDS.Vertex_s(vertex1))  # Common vertex found
 
             explorer2.Next()
         vert_exp.Next()
@@ -9068,7 +9307,7 @@ def unwrap_topods_compound(
     return compound
 
 
-def get_top_level_topods_shapes(topods_shape: TopoDS_Shape) -> ShapeList[TopoDS_Shape]:
+def get_top_level_topods_shapes(topods_shape: TopoDS_Shape) -> list[TopoDS_Shape]:
     """
     Retrieve the first level of child shapes from the shape.
 
@@ -9079,7 +9318,7 @@ def get_top_level_topods_shapes(topods_shape: TopoDS_Shape) -> ShapeList[TopoDS_
     without returning the nested compound itself.
 
     Returns:
-        ShapeList[TopoDS_Shape]: A list of all first-level non-compound child shapes.
+        list[TopoDS_Shape]: A list of all first-level non-compound child shapes.
 
     Example:
         If the current shape is a compound containing both simple shapes
@@ -9109,7 +9348,7 @@ def get_top_level_topods_shapes(topods_shape: TopoDS_Shape) -> ShapeList[TopoDS_
         else:
             first_level_shapes.append(current_shape)
 
-    return ShapeList(first_level_shapes)
+    return first_level_shapes
 
 
 def _topods_bool_op(
@@ -9151,7 +9390,7 @@ def _topods_bool_op(
 
 
 def _make_topods_face_from_wires(
-    outer_wire: TopoDS_Wire, inner_wires: Optional[Sequence[TopoDS_Wire]] = None
+    outer_wire: TopoDS_Wire, inner_wires: Optional[Iterable[TopoDS_Wire]] = None
 ) -> TopoDS_Face:
     """_make_topods_face_from_wires
 
@@ -9159,7 +9398,7 @@ def _make_topods_face_from_wires(
 
     Args:
         outer_wire (TopoDS_Wire): closed perimeter wire
-        inner_wires (Sequence[TopoDS_Wire], optional): holes. Defaults to None.
+        inner_wires (Iterable[TopoDS_Wire], optional): holes. Defaults to None.
 
     Raises:
         ValueError: outer wire not closed
@@ -9172,7 +9411,7 @@ def _make_topods_face_from_wires(
     """
     if inner_wires and not BRep_Tool.IsClosed_s(outer_wire):
         raise ValueError("Cannot build face(s): outer wire is not closed")
-    inner_wires = inner_wires if inner_wires else []
+    inner_wires = list(inner_wires) if inner_wires else []
 
     # check if wires are coplanar
     verification_compound = _make_topods_compound_from_shapes(
@@ -9204,7 +9443,7 @@ def _make_topods_face_from_wires(
     sf_f.FixOrientation()
     sf_f.Perform()
 
-    return downcast(sf_f.Result())
+    return TopoDS.Face_s(sf_f.Result())
 
 
 def _sew_topods_faces(faces: Sequence[TopoDS_Face]) -> TopoDS_Shape:
@@ -9217,7 +9456,7 @@ def _sew_topods_faces(faces: Sequence[TopoDS_Face]) -> TopoDS_Shape:
 
 
 def _make_topods_compound_from_shapes(
-    occt_shapes: Sequence[TopoDS_Shape],
+    occt_shapes: Sequence[TopoDS_Shape | None],
 ) -> TopoDS_Compound:
     """Create an OCCT TopoDS_Compound
 
@@ -9234,7 +9473,8 @@ def _make_topods_compound_from_shapes(
     comp_builder.MakeCompound(comp)
 
     for shape in occt_shapes:
-        comp_builder.Add(comp, shape)
+        if shape is not None:
+            comp_builder.Add(comp, shape)
 
     return comp
 
