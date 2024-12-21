@@ -1469,6 +1469,7 @@ class Mixin3D:
         Returns:
             Self:  Chamfered solid
         """
+        edge_list = list(edge_list)
         if face:
             if any((edge for edge in edge_list if edge not in face.edges())):
                 raise ValueError("Some edges are not part of the face")
@@ -1566,6 +1567,7 @@ class Mixin3D:
         Returns:
             Solid: A hollow solid.
         """
+        faces = list(faces) if faces else []
         if kind == Kind.TANGENT:
             raise ValueError("Kind.TANGENT not supported")
 
@@ -1631,6 +1633,7 @@ class Mixin3D:
         Returns:
             Solid: A shelled solid.
         """
+        openings = list(openings) if openings else []
         if kind == Kind.TANGENT:
             raise ValueError("Kind.TANGENT not supported")
 
@@ -1771,7 +1774,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     # pylint: disable=too-many-instance-attributes, too-many-public-methods
 
-    _dim = None
+    @property
+    @abstractmethod
+    def _dim(self) -> int | None:
+        """Dimension of the object"""
 
     shape_LUT = {
         ta.TopAbs_VERTEX: "Vertex",
@@ -2174,7 +2180,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             result = Shape._show_tree(tree[0], show_center)
         return result
 
-    def __add__(self, other: Union[list[Shape], Shape]) -> Self:
+    def __add__(self, other: Union[list[Shape], Shape]) -> Self | ShapeList[Self]:
         """fuse shape to self operator +"""
         # Convert `other` to list of base objects and filter out None values
         summands = [
@@ -2208,7 +2214,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         return sum_shape
 
-    def __sub__(self, other: Union[Shape, Iterable[Shape]]) -> Self:
+    def __sub__(self, other: Union[Shape, Iterable[Shape]]) -> Self | ShapeList[Self]:
         """cut shape from self operator -"""
 
         if self.wrapped is None:
@@ -2483,6 +2489,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Returns:
             Vector: center of multiple objects
         """
+        objects = list(objects)
         if center_of == CenterOf.MASS:
             total_mass = sum(Shape.compute_mass(o) for o in objects)
             weighted_centers = [
@@ -2999,8 +3006,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Returns:
 
         """
+        args = list(args)
+        tools = list(tools)
         # Find the highest order class from all the inputs Solid > Vertex
-        order_dict = {type(s): type(s).order for s in [self] + list(args) + list(tools)}
+        order_dict = {type(s): type(s).order for s in [self] + args + tools}
         highest_order = sorted(order_dict.items(), key=lambda item: item[1])[-1]
 
         # The base of the operation
@@ -4257,7 +4266,7 @@ class ShapeList(list[T]):
 
     def __add__(self, other: ShapeList) -> ShapeList[T]:  # type: ignore
         """Combine two ShapeLists together operator +"""
-        return ShapeList(list(self) + list(other))
+        return ShapeList(itertools.chain(self, other))
 
     def __sub__(self, other: ShapeList) -> ShapeList[T]:
         """Differences between two ShapeLists operator -"""
@@ -4409,7 +4418,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         """
 
         if isinstance(obj, Iterable):
-            obj = _make_topods_compound_from_shapes([s.wrapped for s in obj])
+            obj = _make_topods_compound_from_shapes(s.wrapped for s in obj)
 
         super().__init__(
             obj=obj,
@@ -4482,7 +4491,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
             parent.wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in parent.children]
+                c.wrapped for c in parent.children
             )
         else:
             parent.wrapped = None
@@ -4496,7 +4505,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         """Method call after attaching to `parent`."""
         logger.debug("Updated parent of %s to %s", self.label, parent.label)
         parent.wrapped = _make_topods_compound_from_shapes(
-            [c.wrapped for c in parent.children]
+            c.wrapped for c in parent.children
         )
 
     def _post_detach_children(self, children):
@@ -4505,7 +4514,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             kids = ",".join([child.label for child in children])
             logger.debug("Removing children %s from %s", kids, self.label)
             self.wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
+                c.wrapped for c in self.children
             )
         # else:
         #     logger.debug("Removing no children from %s", self.label)
@@ -4521,12 +4530,12 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             kids = ",".join([child.label for child in children])
             logger.debug("Adding children %s to %s", kids, self.label)
             self.wrapped = _make_topods_compound_from_shapes(
-                [c.wrapped for c in self.children]
+                c.wrapped for c in self.children
             )
         # else:
         #     logger.debug("Adding no children to %s", self.label)
 
-    def __add__(self, other: Shape | Sequence[Shape]) -> Compound:
+    def __add__(self, other: Shape | Iterable[Shape]) -> Compound:
         """Combine other to self `+` operator
 
         Note that if all of the objects are connected Edges/Wires the result
@@ -4566,7 +4575,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
 
         return result
 
-    def __sub__(self, other: Shape | Sequence[Shape]) -> Compound:
+    def __sub__(self, other: Shape | Iterable[Shape]) -> Compound:
         """Cut other to self `-` operator"""
         difference = Shape.__sub__(self, other)
         difference = Compound(
@@ -4576,7 +4585,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
 
         return difference
 
-    def __and__(self, other: Shape | Sequence[Shape]) -> Compound:
+    def __and__(self, other: Shape | Iterable[Shape]) -> Compound:
         """Intersect other to self `&` operator"""
         intersection = Shape.__and__(self, other)
         intersection = Compound(
@@ -6558,6 +6567,7 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
         Returns:
             Face: Potentially non-planar face
         """
+        exterior = list(exterior) if isinstance(exterior, Iterable) else exterior
         # pylint: disable=too-many-branches
         if surface_points:
             surface_points = [Vector(p) for p in surface_points]
@@ -6894,7 +6904,7 @@ class Shell(Mixin2D, Shape[TopoDS_Shell]):
             color (Color, optional): Defaults to None.
             parent (Compound, optional): assembly parent. Defaults to None.
         """
-
+        obj = list(obj) if isinstance(obj, Iterable) else obj
         if isinstance(obj, Iterable) and len(obj) == 1:
             obj = obj[0]
 
@@ -7812,7 +7822,7 @@ class Vertex(Shape[TopoDS_Vertex]):
         """Default Vertext at the origin"""
 
     @overload
-    def __init__(self, v: TopoDS_Vertex):  # pragma: no cover
+    def __init__(self, ocp_vx: TopoDS_Vertex):  # pragma: no cover
         """Vertex from OCCT TopoDS_Vertex object"""
 
     @overload
@@ -7823,40 +7833,30 @@ class Vertex(Shape[TopoDS_Vertex]):
     def __init__(self, v: Iterable[float]):
         """Vertex from Vector or other iterators"""
 
-    @overload
-    def __init__(self, v: tuple[float]):
-        """Vertex from tuple of floats"""
-
     def __init__(self, *args, **kwargs):
         self.vertex_index = 0
-        x, y, z, ocp_vx = 0, 0, 0, None
 
-        unknown_args = ", ".join(set(kwargs.keys()).difference(["v", "X", "Y", "Z"]))
-        if unknown_args:
-            raise ValueError(f"Unexpected argument(s) {unknown_args}")
+        ocp_vx = kwargs.pop("ocp_vx", None)
+        v = kwargs.pop("v", None)
+        x = kwargs.pop("X", 0)
+        y = kwargs.pop("Y", 0)
+        z = kwargs.pop("Z", 0)
 
-        if args and all(isinstance(args[i], (int, float)) for i in range(len(args))):
-            values = list(args)
-            values += [0.0] * max(0, (3 - len(args)))
-            x, y, z = values[0:3]
-        elif len(args) == 1 or "v" in kwargs:
-            first_arg = args[0] if args else None
-            first_arg = kwargs.get("v", first_arg)  # override with kwarg
-            if isinstance(first_arg, (tuple, Iterable)):
-                try:
-                    values = [float(value) for value in first_arg]
-                except (TypeError, ValueError) as exc:
-                    raise TypeError("Expected floats") from exc
-                if len(values) < 3:
-                    values += [0.0] * (3 - len(values))
-                x, y, z = values
-            elif isinstance(first_arg, TopoDS_Vertex):
-                ocp_vx = first_arg
+        # Handle unexpected kwargs
+        if kwargs:
+            raise ValueError(f"Unexpected argument(s): {', '.join(kwargs.keys())}")
+
+        if args:
+            if isinstance(args[0], TopoDS_Vertex):
+                ocp_vx = args[0]
+            elif isinstance(args[0], Iterable):
+                v = args[0]
             else:
-                raise TypeError("Expected floats, TopoDS_Vertex, or iterable")
-        x = kwargs.get("X", x)
-        y = kwargs.get("Y", y)
-        z = kwargs.get("Z", z)
+                x, y, z = args[:3] + (0,) * (3 - len(args))
+
+        if v is not None:
+            x, y, z = itertools.islice(itertools.chain(v, [0, 0, 0]), 3)
+
         ocp_vx = (
             downcast(BRepBuilderAPI_MakeVertex(gp_Pnt(x, y, z)).Vertex())
             if ocp_vx is None
@@ -7897,12 +7897,12 @@ class Vertex(Shape[TopoDS_Vertex]):
         geom_point = BRep_Tool.Pnt_s(self.wrapped)
         return (geom_point.X(), geom_point.Y(), geom_point.Z())
 
-    def center(self) -> Vector:
+    def center(self, *args, **kwargs) -> Vector:
         """The center of a vertex is itself!"""
         return Vector(self)
 
-    def __add__(
-        self, other: Union[Vertex, Vector, Tuple[float, float, float]]
+    def __add__(  # type: ignore
+        self, other: Vertex | Vector | tuple[float, float, float]
     ) -> Vertex:
         """Add
 
@@ -7936,7 +7936,7 @@ class Vertex(Shape[TopoDS_Vertex]):
             )
         return new_vertex
 
-    def __sub__(self, other: Union[Vertex, Vector, tuple]) -> Vertex:
+    def __sub__(self, other: Union[Vertex, Vector, tuple]) -> Vertex:  # type: ignore
         """Subtract
 
         Substract a Vertex with a Vertex, Vector or Tuple from self
@@ -8604,7 +8604,6 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
             Wire: chamfered wire
         """
         reference_edge = edge
-        del edge
 
         # Create a face to chamfer
         unchamfered_face = _make_topods_face_from_wires(self.wrapped)
@@ -8726,7 +8725,7 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
         #     ]
         # ):
         #     raise ValueError("edges overlap")
-
+        edges = list(edges)
         fragments_per_edge = int(2 / tolerance)
         points_lookup = {}  # lookup from point index to edge/position on edge
         points = []  # convex hull point cloud
@@ -9170,6 +9169,8 @@ def polar(length: float, angle: float) -> tuple[float, float]:
 
 def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shape]:
     """Compare the OCCT objects of each list and return the differences"""
+    shapes_one = list(shapes_one)
+    shapes_two = list(shapes_two)
     occt_one = set(shape.wrapped for shape in shapes_one)
     occt_two = set(shape.wrapped for shape in shapes_two)
     occt_delta = list(occt_one - occt_two)
@@ -9366,7 +9367,8 @@ def _topods_bool_op(
     Returns: TopoDS_Shape
 
     """
-
+    args = list(args)
+    tools = list(tools)
     arg = TopTools_ListOfShape()
     for obj in args:
         arg.Append(obj)
@@ -9446,7 +9448,7 @@ def _make_topods_face_from_wires(
     return TopoDS.Face_s(sf_f.Result())
 
 
-def _sew_topods_faces(faces: Sequence[TopoDS_Face]) -> TopoDS_Shape:
+def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:
     """Sew faces into a shell if possible"""
     shell_builder = BRepBuilderAPI_Sewing()
     for face in faces:
@@ -9456,7 +9458,7 @@ def _sew_topods_faces(faces: Sequence[TopoDS_Face]) -> TopoDS_Shape:
 
 
 def _make_topods_compound_from_shapes(
-    occt_shapes: Sequence[TopoDS_Shape | None],
+    occt_shapes: Iterable[TopoDS_Shape | None],
 ) -> TopoDS_Compound:
     """Create an OCCT TopoDS_Compound
 
@@ -9482,7 +9484,7 @@ def _make_topods_compound_from_shapes(
 def find_max_dimension(shapes: Shape | Iterable[Shape]) -> float:
     """Return the maximum dimension of one or more shapes"""
     shapes = shapes if isinstance(shapes, Iterable) else [shapes]
-    composite = _make_topods_compound_from_shapes([s.wrapped for s in shapes])
+    composite = _make_topods_compound_from_shapes(s.wrapped for s in shapes)
     bbox = BoundBox.from_topo_ds(composite, tolerance=TOLERANCE, optimal=True)
     return bbox.diagonal
 
