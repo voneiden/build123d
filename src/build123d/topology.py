@@ -4266,7 +4266,8 @@ class ShapeList(list[T]):
 
     def __add__(self, other: ShapeList) -> ShapeList[T]:  # type: ignore
         """Combine two ShapeLists together operator +"""
-        return ShapeList(itertools.chain(self, other))
+        # return ShapeList(itertools.chain(self, other))
+        return ShapeList(list(self) + list(other))
 
     def __sub__(self, other: ShapeList) -> ShapeList[T]:
         """Differences between two ShapeLists operator -"""
