@@ -4205,9 +4205,7 @@ class TestVector(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             (v1 & Solid.make_box(2, 4, 5)).vertex(), (1, 2, 3), 5
         )
-        self.assertTrue(
-            len(v1.intersect(Solid.make_box(0.5, 0.5, 0.5)).vertices()) == 0
-        )
+        self.assertIsNone(v1.intersect(Solid.make_box(0.5, 0.5, 0.5)))
 
 
 class TestVectorLike(DirectApiTestCase):

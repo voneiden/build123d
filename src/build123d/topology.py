@@ -36,15 +36,12 @@ from __future__ import annotations
 #   too-many-arguments, too-many-locals, too-many-public-methods,
 #   too-many-statements, too-many-instance-attributes, too-many-branches
 import copy
-import inspect
 import itertools
 import os
 import platform
 import sys
-import types
 import warnings
-from abc import ABC, ABCMeta, abstractmethod
-from io import BytesIO
+from abc import ABC, abstractmethod
 from itertools import combinations
 from math import radians, inf, pi, sin, cos, tan, copysign, ceil, floor, isclose
 from typing import (
@@ -66,8 +63,7 @@ from typing import (
     TYPE_CHECKING,
 )
 from typing import cast as tcast
-from typing_extensions import Self, Literal, deprecated
-
+from typing_extensions import Self, Literal
 from anytree import NodeMixin, PreOrderIter, RenderTree
 from IPython.lib.pretty import pretty, PrettyPrinter
 from numpy import ndarray
@@ -171,6 +167,7 @@ from OCP.Geom import (
     Geom_Line,
 )
 from OCP.GeomAdaptor import GeomAdaptor_Curve
+from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line, Geom2d_TrimmedCurve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
@@ -205,8 +202,6 @@ from OCP.gp import (
 from OCP.GProp import GProp_GProps
 from OCP.HLRAlgo import HLRAlgo_Projector
 from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCP.IFSelect import IFSelect_ReturnStatus
-from OCP.Interface import Interface_Static
 from OCP.IVtkOCC import IVtkOCC_Shape, IVtkOCC_ShapeMesher
 from OCP.IVtkVTK import IVtkVTK_ShapeData
 from OCP.LocOpe import LocOpe_DPrism
@@ -233,8 +228,6 @@ from OCP.Standard import (
 from OCP.StdFail import StdFail_NotDone
 from OCP.StdPrs import StdPrs_BRepFont
 from OCP.StdPrs import StdPrs_BRepTextBuilder as Font_BRepTextBuilder
-from OCP.STEPControl import STEPControl_AsIs, STEPControl_Writer
-from OCP.StlAPI import StlAPI_Writer
 
 # Array of vectors (used for B-spline interpolation):
 # Array of points (used for B-spline construction):
@@ -363,8 +356,10 @@ def tuplify(obj: Any, dim: int) -> tuple | None:
 class Mixin1D:
     """Methods to add to the Edge and Wire classes"""
 
-    def __add__(self, other: Union[list[Shape], Shape]) -> Self:
+    def __add__(self, other: Shape | Iterable[Shape]) -> Edge | Wire | ShapeList[Edge]:
         """fuse shape to wire/edge operator +"""
+
+        assert isinstance(self, Shape)  # for typing
 
         # Convert `other` to list of base topods objects and filter out None values
         summands = [
@@ -383,6 +378,9 @@ class Mixin1D:
         # Convert back to Edge/Wire objects now that it's safe to do so
         summands = [Mixin1D.cast(s) for s in summands]
         summand_edges = [e for summand in summands for e in summand.edges()]
+
+        assert isinstance(self, Shape)  # for typing
+
         if self.wrapped is None:  # an empty object
             if len(summands) == 1:
                 sum_shape = summands[0]
@@ -395,7 +393,7 @@ class Mixin1D:
                         sum_shape = type(self)(sum_shape)
         else:
             try:
-                sum_shape = Wire(self.edges() + summand_edges)
+                sum_shape = Wire(self.edges() + ShapeList(summand_edges))
             except Exception:
                 sum_shape = self.fuse(*summands)
 
@@ -408,7 +406,7 @@ class Mixin1D:
         return sum_shape
 
     @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Self:
+    def cast(cls, obj: TopoDS_Shape) -> Vertex | Edge | Wire:
         "Returns the right type of wrapper, given a OCCT object"
 
         # Extend the lookup table with additional entries
@@ -461,6 +459,8 @@ class Mixin1D:
             - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
               either a `Self` or `list[Self]`, or `None` if no corresponding part is found.
         """
+        assert isinstance(self, Shape)  # for typing
+
         shape_list = TopTools_ListOfShape()
         shape_list.Append(self.wrapped)
 
@@ -505,7 +505,8 @@ class Mixin1D:
             except StdFail_NotDone as err:
                 raise RuntimeError("Error determining top/bottom") from err
 
-        tops, bottoms = [], []
+        tops: list[Shape] = []
+        bottoms: list[Shape] = []
         properties = GProp_GProps()
         for part in get_top_level_topods_shapes(split_result):
             sub_shape = self.__class__.cast(part)
@@ -534,14 +535,17 @@ class Mixin1D:
 
     def vertices(self) -> ShapeList[Vertex]:
         """vertices - all the vertices in this Shape"""
+        assert isinstance(self, Shape)  # for typing
         return Shape.get_shape_list(self, "Vertex")
 
     def vertex(self) -> Vertex:
         """Return the Vertex"""
+        assert isinstance(self, Shape)  # for typing
         return Shape.get_single_shape(self, "Vertex")
 
     def edges(self) -> ShapeList[Edge]:
         """edges - all the edges in this Shape"""
+        assert isinstance(self, Shape)  # for typing
         edge_list = Shape.get_shape_list(self, "Edge")
         return edge_list.filter_by(
             lambda e: BRep_Tool.Degenerated_s(e.wrapped), reverse=True
@@ -549,14 +553,17 @@ class Mixin1D:
 
     def edge(self) -> Edge:
         """Return the Edge"""
+        assert isinstance(self, Shape)  # for typing
         return Shape.get_single_shape(self, "Edge")
 
     def wires(self) -> ShapeList[Wire]:
         """wires - all the wires in this Shape"""
+        assert isinstance(self, Shape)  # for typing
         return Shape.get_shape_list(self, "Wire")
 
     def wire(self) -> Wire:
         """Return the Wire"""
+        assert isinstance(self, Shape)  # for typing
         return Shape.get_single_shape(self, "Wire")
 
     def start_point(self) -> Vector:
@@ -564,6 +571,7 @@ class Mixin1D:
 
         Note that circles may have identical start and end points.
         """
+        assert isinstance(self, Shape)  # for typing
         curve = self.geom_adaptor()
         umin = curve.FirstParameter()
 
@@ -574,6 +582,7 @@ class Mixin1D:
 
         Note that circles may have identical start and end points.
         """
+        assert isinstance(self, Shape)  # for typing
         curve = self.geom_adaptor()
         umax = curve.LastParameter()
 
@@ -590,6 +599,7 @@ class Mixin1D:
         Returns:
             float: parameter value
         """
+        assert isinstance(self, Shape)  # for typing
         curve = self.geom_adaptor()
 
         length = GCPnts_AbscissaPoint.Length_s(curve)
@@ -619,6 +629,7 @@ class Mixin1D:
         Returns:
             Vector: tangent value
         """
+        assert isinstance(self, Shape)  # for typing
 
         if isinstance(position, (float, int)):
             curve = self.geom_adaptor()
@@ -684,6 +695,7 @@ class Mixin1D:
         Returns:
 
         """
+        assert isinstance(self, Shape)  # for typing
 
         curve = self.geom_adaptor()
         gtype = self.geom_type
@@ -717,6 +729,8 @@ class Mixin1D:
         Returns:
             Vector: center
         """
+        assert isinstance(self, Shape)  # for typing
+
         if center_of == CenterOf.GEOMETRY:
             middle = self.position_at(0.5)
         elif center_of == CenterOf.MASS:
@@ -727,7 +741,7 @@ class Mixin1D:
             middle = self.bounding_box().center()
         return middle
 
-    def common_plane(self, *lines: Union[Edge, Wire]) -> Union[None, Plane]:
+    def common_plane(self, *lines: Edge | Wire | None) -> Union[None, Plane]:
         """common_plane
 
         Find the plane containing all the edges/wires (including self). If there
@@ -743,8 +757,10 @@ class Mixin1D:
         # pylint: disable=too-many-locals
         # Note: BRepLib_FindSurface is not helpful as it requires the
         # Edges to form a surface perimeter.
+        assert isinstance(self, Shape)  # for typing
+
         points: list[Vector] = []
-        all_lines: list[Edge, Wire] = [
+        all_lines: list[Edge | Wire] = [
             line for line in [self, *lines] if line is not None
         ]
         if any(not isinstance(line, (Edge, Wire)) for line in all_lines):
@@ -766,9 +782,6 @@ class Mixin1D:
             # Shorten any infinite lines (from converted Axis)
             normal_lines = list(filter(lambda line: line.length <= 1e50, all_lines))
             infinite_lines = filter(lambda line: line.length > 1e50, all_lines)
-            # shortened_lines = [
-            #     l.trim(0.4999999999, 0.5000000001) for l in infinite_lines
-            # ]
             shortened_lines = [l.trim_to_length(0.5, 10) for l in infinite_lines]
             all_lines = normal_lines + shortened_lines
 
@@ -791,7 +804,9 @@ class Mixin1D:
             x_dir = (extremes[1] - extremes[0]).normalized()
             z_dir = (extremes[2] - extremes[0]).cross(x_dir)
             try:
-                c_plane = Plane(origin=(sum(extremes) / 3), z_dir=z_dir)
+                c_plane = Plane(
+                    origin=(sum(extremes, Vector(0, 0, 0)) / 3), z_dir=z_dir
+                )
                 c_plane = c_plane.shift_origin((0, 0))
             except ValueError:
                 # There is no valid common plane
@@ -806,6 +821,7 @@ class Mixin1D:
     @property
     def length(self) -> float:
         """Edge or Wire length"""
+        assert isinstance(self, Shape)  # for typing
         return GCPnts_AbscissaPoint.Length_s(self.geom_adaptor())
 
     @property
@@ -823,6 +839,7 @@ class Mixin1D:
           ValueError: if kernel can not reduce the shape to a circular edge
 
         """
+        assert isinstance(self, Shape)  # for typing
         geom = self.geom_adaptor()
         try:
             circ = geom.Circle()
@@ -833,11 +850,17 @@ class Mixin1D:
     @property
     def is_forward(self) -> bool:
         """Does the Edge/Wire loop forward or reverse"""
+        assert isinstance(self, Shape)  # for typing
+        if self.wrapped is None:
+            raise ValueError("Can't determine direction of empty Edge or Wire")
         return self.wrapped.Orientation() == TopAbs_Orientation.TopAbs_FORWARD
 
     @property
     def is_closed(self) -> bool:
         """Are the start and end points equal?"""
+        assert isinstance(self, Shape)  # for typing
+        if self.wrapped is None:
+            raise ValueError("Can't determine if empty Edge or Wire is closed")
         return BRep_Tool.IsClosed_s(self.wrapped)
 
     @property
@@ -860,6 +883,7 @@ class Mixin1D:
         Returns:
             Vector: position on the underlying curve
         """
+        assert isinstance(self, Shape)  # for typing
         curve = self.geom_adaptor()
 
         if position_mode == PositionMode.PARAMETER:
@@ -911,6 +935,7 @@ class Mixin1D:
             Location: A Location object representing local coordinate system
                 at the specified distance.
         """
+        assert isinstance(self, Shape)  # for typing
         curve = self.geom_adaptor()
 
         if position_mode == PositionMode.PARAMETER:
@@ -970,15 +995,15 @@ class Mixin1D:
             self.location_at(d, position_mode, frame_method, planar) for d in distances
         ]
 
-    def __matmul__(self: Union[Edge, Wire], position: float) -> Vector:
+    def __matmul__(self, position: float) -> Vector:
         """Position on wire operator @"""
         return self.position_at(position)
 
-    def __mod__(self: Union[Edge, Wire], position: float) -> Vector:
+    def __mod__(self, position: float) -> Vector:
         """Tangent on wire operator %"""
         return self.tangent_at(position)
 
-    def __xor__(self: Union[Edge, Wire], position: float) -> Location:
+    def __xor__(self, position: float) -> Location:
         """Location on wire operator ^"""
         return self.location_at(position)
 
@@ -1039,7 +1064,7 @@ class Mixin1D:
         if side != Side.BOTH:
             # Find and remove the end arcs
             offset_edges = offset_wire.edges()
-            edges_to_keep = [[], [], []]
+            edges_to_keep: list[list[int]] = [[], [], []]
             i = 0
             for edge in offset_edges:
                 if edge.geom_type == GeomType.CIRCLE and (
@@ -1072,7 +1097,9 @@ class Mixin1D:
                 else:
                     edge0 = Edge.make_line(self0, end1)
                     edge1 = Edge.make_line(self1, end0)
-                offset_wire = Wire(line.edges() + offset_wire.edges() + [edge0, edge1])
+                offset_wire = Wire(
+                    line.edges() + offset_wire.edges() + ShapeList([edge0, edge1])
+                )
 
         offset_edges = offset_wire.edges()
         return offset_edges[0] if len(offset_edges) == 1 else offset_wire
@@ -1104,7 +1131,7 @@ class Mixin1D:
 
     def project(
         self, face: Face, direction: VectorLike, closest: bool = True
-    ) -> Union[Mixin1D, ShapeList[Mixin1D]]:
+    ) -> Edge | Wire | ShapeList[Edge | Wire]:
         """Project onto a face along the specified direction
 
         Args:
@@ -1115,6 +1142,9 @@ class Mixin1D:
         Returns:
 
         """
+        assert isinstance(self, Shape)  # for typing
+        if self.wrapped is None:
+            raise ValueError("Can't project an empty Edge or Wire")
 
         bldr = BRepProj_Projection(
             self.wrapped, face.wrapped, Vector(direction).to_dir()
@@ -1122,7 +1152,7 @@ class Mixin1D:
         shapes: TopoDS_Compound = bldr.Shape()
 
         # select the closest projection if requested
-        return_value: Union[Mixin1D, list[Mixin1D]]
+        return_value: Edge | Wire | ShapeList[Edge | Wire]
 
         if closest:
             dist_calc = BRepExtrema_DistShapeShape()
@@ -1151,7 +1181,7 @@ class Mixin1D:
         self,
         viewport_origin: VectorLike,
         viewport_up: VectorLike = (0, 0, 1),
-        look_at: VectorLike = None,
+        look_at: VectorLike | None = None,
     ) -> tuple[ShapeList[Edge], ShapeList[Edge]]:
         """project_to_viewport
 
@@ -1167,6 +1197,7 @@ class Mixin1D:
         Returns:
             tuple[ShapeList[Edge],ShapeList[Edge]]: visible & hidden Edges
         """
+        assert isinstance(self, Shape)  # for typing
 
         def extract_edges(compound):
             edges = []  # List to store the extracted edges
@@ -1295,12 +1326,62 @@ class Mixin2D:
         """Return a copy of self moved along the normal by amount"""
         return copy.deepcopy(self).moved(Location(self.normal_at() * amount))
 
+    def find_intersection_points(
+        self, other: Axis, tolerance: float = TOLERANCE
+    ) -> list[tuple[Vector, Vector]]:
+        """Find point and normal at intersection
+
+        Return both the point(s) and normal(s) of the intersection of the axis and the shape
+
+        Args:
+            axis (Axis): axis defining the intersection line
+
+        Returns:
+            list[tuple[Vector, Vector]]: Point and normal of intersection
+        """
+        assert isinstance(self, Shape)  # for typing
+
+        if self.wrapped is None:
+            return []
+
+        intersection_line = gce_MakeLin(other.wrapped).Value()
+        intersect_maker = BRepIntCurveSurface_Inter()
+        intersect_maker.Init(self.wrapped, intersection_line, tolerance)
+
+        intersections = []
+        while intersect_maker.More():
+            inter_pt = intersect_maker.Pnt()
+            # Calculate distance along axis
+            distance = other.to_plane().to_local_coords(Vector(inter_pt)).Z
+            intersections.append(
+                (
+                    intersect_maker.Face(),  # TopoDS_Face
+                    Vector(inter_pt),
+                    distance,
+                )
+            )
+            intersect_maker.Next()
+
+        intersections.sort(key=lambda x: x[2])
+        intersecting_faces = [i[0] for i in intersections]
+        intersecting_points = [i[1] for i in intersections]
+        intersecting_normals = [
+            _topods_face_normal_at(f, intersecting_points[i].to_pnt())
+            for i, f in enumerate(intersecting_faces)
+        ]
+        result = []
+        for pnt, normal in zip(intersecting_points, intersecting_normals):
+            result.append((pnt, normal))
+
+        return result
+
 
 class Mixin3D:
     """Additional methods to add to 3D Shape classes"""
 
     project_to_viewport = Mixin1D.project_to_viewport
     split = Mixin1D.split
+    find_intersection_points = Mixin2D.find_intersection_points
 
     @classmethod
     def cast(cls, obj: TopoDS_Shape) -> Self:
@@ -2180,7 +2261,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             result = Shape._show_tree(tree[0], show_center)
         return result
 
-    def __add__(self, other: Union[list[Shape], Shape]) -> Self | ShapeList[Self]:
+    def __add__(self, other: Shape | Iterable[Shape]) -> Self | ShapeList[Self]:
         """fuse shape to self operator +"""
         # Convert `other` to list of base objects and filter out None values
         summands = [
@@ -2250,7 +2331,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         return difference
 
-    def __and__(self, other: Shape | Iterable[Shape]) -> Self | ShapeList[Self]:
+    def __and__(self, other: Shape | Iterable[Shape]) -> None | Self | ShapeList[Self]:
         """intersect shape with self operator &"""
         others = other if isinstance(other, (list, tuple)) else [other]
 
@@ -2260,6 +2341,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         if (
             not isinstance(new_shape, list)
+            and new_shape is not None
             and new_shape.wrapped is not None
             and SkipClean.clean
         ):
@@ -2279,7 +2361,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         return [loc * self for loc in other]
 
     @abstractmethod
-    def center(self, center_of: CenterOf | None = None) -> Vector:
+    def center(self, *args, **kwargs) -> Vector:
         """All of the derived classes from Shape need a center method"""
 
     def clean(self) -> Self:
@@ -3106,7 +3188,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def intersect(
         self, *to_intersect: Union[Shape, Axis, Plane]
-    ) -> Self | ShapeList[Self]:
+    ) -> None | Self | ShapeList[Self]:
         """Intersection of the arguments and this shape
 
         Args:
@@ -3160,7 +3242,13 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # Find the shape intersections
         intersect_op = BRepAlgoAPI_Common()
         shape_intersections = self._bool_op((self,), objs, intersect_op)
-
+        if isinstance(shape_intersections, ShapeList) and not shape_intersections:
+            return None
+        elif (
+            not isinstance(shape_intersections, ShapeList)
+            and shape_intersections.is_null()
+        ):
+            return None
         return shape_intersections
 
     @classmethod
@@ -3600,7 +3688,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
     def _repr_javascript_(self):
         """Jupyter 3D representation support"""
 
-        from .jupyter_tools import display
+        from build123d.jupyter_tools import display
 
         return display(self)._repr_javascript_()
 
@@ -3632,51 +3720,6 @@ class Shape(NodeMixin, Generic[TOPODS]):
         t_o = gp_Trsf()
         t_o.SetTranslation(Vector(offset).wrapped)
         return self._apply_transform(t_o * t_rx * t_ry * t_rz)
-
-    def find_intersection_points(self, other: Axis) -> list[tuple[Vector, Vector]]:
-        """Find point and normal at intersection
-
-        Return both the point(s) and normal(s) of the intersection of the axis and the shape
-
-        Args:
-            axis (Axis): axis defining the intersection line
-
-        Returns:
-            list[tuple[Vector, Vector]]: Point and normal of intersection
-        """
-        if self.wrapped is None:
-            return []
-
-        intersection_line = gce_MakeLin(other.wrapped).Value()
-        intersect_maker = BRepIntCurveSurface_Inter()
-        intersect_maker.Init(self.wrapped, intersection_line, 0.0001)
-
-        intersections = []
-        while intersect_maker.More():
-            inter_pt = intersect_maker.Pnt()
-            # Calculate distance along axis
-            distance = other.to_plane().to_local_coords(Vector(inter_pt)).Z
-            intersections.append(
-                (
-                    intersect_maker.Face(),  # TopoDS_Face
-                    Vector(inter_pt),
-                    distance,
-                )
-            )
-            intersect_maker.Next()
-
-        intersections.sort(key=lambda x: x[2])
-        intersecting_faces = [i[0] for i in intersections]
-        intersecting_points = [i[1] for i in intersections]
-        intersecting_normals = [
-            _topods_face_normal_at(f, intersecting_points[i].to_pnt())
-            for i, f in enumerate(intersecting_faces)
-        ]
-        result = []
-        for pnt, normal in zip(intersecting_points, intersecting_normals):
-            result.append((pnt, normal))
-
-        return result
 
     def project_faces(
         self,
@@ -4266,7 +4309,7 @@ class ShapeList(list[T]):
 
     def __add__(self, other: ShapeList) -> ShapeList[T]:  # type: ignore
         """Combine two ShapeLists together operator +"""
-        # return ShapeList(itertools.chain(self, other))
+        # return ShapeList(itertools.chain(self, other)) # breaks MacOS-13
         return ShapeList(list(self) + list(other))
 
     def __sub__(self, other: ShapeList) -> ShapeList[T]:
@@ -4672,24 +4715,25 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             bbox_intersection = children_bbox[child_index_pair[0]].intersect(
                 children_bbox[child_index_pair[1]]
             )
-            bbox_common_volume = (
-                0.0 if isinstance(bbox_intersection, list) else bbox_intersection.volume
-            )
-            if bbox_common_volume > tolerance:
+            if bbox_intersection is not None:
                 obj_intersection = children[child_index_pair[0]].intersect(
                     children[child_index_pair[1]]
                 )
-                common_volume = (
-                    0.0
-                    if isinstance(obj_intersection, list)
-                    else obj_intersection.volume
-                )
-                if common_volume > tolerance:
-                    return (
-                        True,
-                        (children[child_index_pair[0]], children[child_index_pair[1]]),
-                        common_volume,
+                if obj_intersection is not None:
+                    common_volume = (
+                        0.0
+                        if isinstance(obj_intersection, list)
+                        else obj_intersection.volume
                     )
+                    if common_volume > tolerance:
+                        return (
+                            True,
+                            (
+                                children[child_index_pair[0]],
+                                children[child_index_pair[1]],
+                            ),
+                            common_volume,
+                        )
         return (False, (), 0.0)
 
     @classmethod
@@ -5095,6 +5139,7 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
             list[float]: u values between 0.0 and 1.0
         """
         angle = angle % 360  # angle needs to always be positive 0..360
+        u_values: list[float]
 
         if self.geom_type == GeomType.LINE:
             if self.tangent_angle_at(0) == angle:
@@ -5104,7 +5149,7 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
         else:
             # Solve this problem geometrically by creating a tangent curve and finding intercepts
             periodic = int(self.is_closed)  # if closed don't include end point
-            tan_pnts = []
+            tan_pnts: list[VectorLike] = []
             previous_tangent = None
 
             # When angles go from 360 to 0 a discontinuity is created so add 360 to these
@@ -5130,7 +5175,7 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
             max_range = 360 * (ceil(tan_curve_bbox.max.Y / 360))
 
             # Create a horizontal line for each 360 cycle and intercept it
-            intercept_pnts = []
+            intercept_pnts: list[Vector] = []
             for i in range(min_range, max_range + 1, 360):
                 line = Edge.make_line((0, angle + i, 0), (100, angle + i, 0))
                 intercept_pnts.extend(tan_curve.find_intersection_points(line))
@@ -5233,8 +5278,8 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
         return ShapeList(valid_crosses)
 
     def intersect(
-        self, *to_intersect: Edge | Axis
-    ) -> Optional[Shape | ShapeList[Shape]]:
+        self, *to_intersect: Edge | Axis | Plane
+    ) -> None | Vertex | Edge | ShapeList[Vertex | Edge]:
         """intersect Edge with Edge or Axis
 
         Args:
@@ -5243,24 +5288,58 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
         Returns:
             Union[Shape, None]: Compound of vertices and/or edges
         """
-        edges = [Edge(obj) if isinstance(obj, Axis) else obj for obj in to_intersect]
-        if not all(isinstance(obj, Edge) for obj in edges):
-            raise TypeError(
-                "Only Edge or Axis instances are supported for intersection"
-            )
+        edges: list[Edge] = []
+        planes: list[Plane] = []
+        edges_common_to_planes: list[Edge] = []
 
-        # Find any intersection points
+        for obj in to_intersect:
+            match obj:
+                case Axis():
+                    edges.append(Edge(obj))
+                case Edge():
+                    edges.append(obj)
+                case Plane():
+                    planes.append(obj)
+                case _:
+                    raise ValueError(f"Unknown object type: {type(obj)}")
+
+        # Find any edge / edge intersection points
         points_sets: list[set[Vector]] = []
         for edge_pair in combinations([self] + edges, 2):
             intersection_points = edge_pair[0].find_intersection_points(edge_pair[1])
             points_sets.append(set(intersection_points))
+
+        # Find any edge / plane intersection points & edges
+        for edge, plane in itertools.product([self] + edges, planes):
+            # Find point intersections
+            geom_line = BRep_Tool.Curve_s(
+                edge.wrapped, edge.param_at(0), edge.param_at(1)
+            )
+            geom_plane = Geom_Plane(plane.local_coord_system)
+            intersection_calculator = GeomAPI_IntCS(geom_line, geom_plane)
+            plane_intersection_points: list[Vector] = []
+            if intersection_calculator.IsDone():
+                plane_intersection_points = [
+                    Vector(intersection_calculator.Point(i + 1))
+                    for i in range(intersection_calculator.NbPoints())
+                ]
+            points_sets.append(set(plane_intersection_points))
+
+            # Find edge intersections
+            if (edge_plane := edge.common_plane()) is not None:  # is a 2D edge
+                if edge_plane.z_dir == plane.z_dir or -edge_plane.z_dir == plane.z_dir:
+                    edges_common_to_planes.append(edge)
+
+        edges.extend(edges_common_to_planes)
 
         # Find the intersection of all sets
         common_points = set.intersection(*points_sets)
         common_vertices = [Vertex(*pnt) for pnt in common_points]
 
         # Find Edge/Edge overlaps
-        common_edges = self._bool_op((self,), edges, BRepAlgoAPI_Common()).edges()
+        common_edges: list[Edge] = []
+        if edges:
+            common_edges = self._bool_op((self,), edges, BRepAlgoAPI_Common()).edges()
 
         if common_vertices or common_edges:
             # If there is just one vertex or edge return it
@@ -5614,21 +5693,21 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
             Edge: the spline
         """
         # pylint: disable=too-many-locals
-        points = [Vector(point) for point in points]
+        point_vectors = [Vector(point) for point in points]
         if tangents:
-            tangents = tuple(Vector(v) for v in tangents)
-        pnts = TColgp_HArray1OfPnt(1, len(points))
-        for i, point in enumerate(points):
+            tangent_vectors = tuple(Vector(v) for v in tangents)
+        pnts = TColgp_HArray1OfPnt(1, len(point_vectors))
+        for i, point in enumerate(point_vectors):
             pnts.SetValue(i + 1, point.to_pnt())
 
         if parameters is None:
             spline_builder = GeomAPI_Interpolate(pnts, periodic, tol)
         else:
-            if len(parameters) != (len(points) + periodic):
+            if len(parameters) != (len(point_vectors) + periodic):
                 raise ValueError(
                     "There must be one parameter for each interpolation point "
                     "(plus one if periodic), or none specified. Parameter count: "
-                    f"{len(parameters)}, point count: {len(points)}"
+                    f"{len(parameters)}, point count: {len(point_vectors)}"
                 )
             parameters_array = TColStd_HArray1OfReal(1, len(parameters))
             for p_index, p_value in enumerate(parameters):
@@ -5637,21 +5716,25 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
             spline_builder = GeomAPI_Interpolate(pnts, parameters_array, periodic, tol)
 
         if tangents:
-            if len(tangents) == 2 and len(points) != 2:
+            if len(tangent_vectors) == 2 and len(point_vectors) != 2:
                 # Specify only initial and final tangent:
-                spline_builder.Load(tangents[0].wrapped, tangents[1].wrapped, scale)
+                spline_builder.Load(
+                    tangent_vectors[0].wrapped, tangent_vectors[1].wrapped, scale
+                )
             else:
-                if len(tangents) != len(points):
+                if len(tangent_vectors) != len(point_vectors):
                     raise ValueError(
                         f"There must be one tangent for each interpolation point, "
                         f"or just two end point tangents. Tangent count: "
-                        f"{len(tangents)}, point count: {len(points)}"
+                        f"{len(tangent_vectors)}, point count: {len(point_vectors)}"
                     )
 
                 # Specify a tangent for each interpolation point:
-                tangents_array = TColgp_Array1OfVec(1, len(tangents))
-                tangent_enabled_array = TColStd_HArray1OfBoolean(1, len(tangents))
-                for t_index, t_value in enumerate(tangents):
+                tangents_array = TColgp_Array1OfVec(1, len(tangent_vectors))
+                tangent_enabled_array = TColStd_HArray1OfBoolean(
+                    1, len(tangent_vectors)
+                )
+                for t_index, t_value in enumerate(tangent_vectors):
                     tangent_enabled_array.SetValue(t_index + 1, t_value is not None)
                     tangent_vec = t_value if t_value is not None else Vector()
                     tangents_array.SetValue(t_index + 1, tangent_vec.wrapped)
@@ -5874,7 +5957,7 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
         locations = self.locations(t_values)
         if positions_only:
             for loc in locations:
-                loc.orientation = (0, 0, 0)
+                loc.orientation = Vector(0, 0, 0)
 
         return locations
 
@@ -8533,12 +8616,12 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
         Returns:
             Wire: an irregular polygon
         """
-        vertices = [Vector(v) for v in vertices]
-        if (vertices[0] - vertices[-1]).length > TOLERANCE and close:
-            vertices.append(vertices[0])
+        vectors = [Vector(v) for v in vertices]
+        if (vectors[0] - vectors[-1]).length > TOLERANCE and close:
+            vectors.append(vectors[0])
 
         wire_builder = BRepBuilderAPI_MakePolygon()
-        for vertex in vertices:
+        for vertex in vectors:
             wire_builder.Add(vertex.to_pnt())
 
         return cls(wire_builder.Wire())
@@ -8742,7 +8825,7 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
 
         # Filter the fragments
         connecting_edge_data = []
-        trim_points = {}
+        trim_points: dict[int, list[int]] = {}
         for simplice in convex_hull.simplices:
             edge0 = points_lookup[simplice[0]][0]
             edge1 = points_lookup[simplice[1]][0]
@@ -8778,13 +8861,13 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
                 )
 
         trim_data = {}
-        for edge, points in trim_points.items():
-            s_points = sorted(points)
+        for edge_index, start_end_pnts in trim_points.items():
+            s_points = sorted(start_end_pnts)
             f_points = []
             for i in range(0, len(s_points) - 1, 2):
                 if s_points[i] != s_points[i + 1]:
                     f_points.append(tuple(s_points[i : i + 2]))
-            trim_data[edge] = f_points
+            trim_data[edge_index] = f_points
 
         connecting_edges = [
             Edge.make_line(
@@ -8793,10 +8876,10 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
             for line in connecting_edge_data
         ]
         trimmed_edges = [
-            edges[edge].trim(
+            edges[edge_index].trim(
                 points_lookup[trim_pair[0]][1], points_lookup[trim_pair[1]][1]
             )
-            for edge, trim_pairs in trim_data.items()
+            for edge_index, trim_pairs in trim_data.items()
             for trim_pair in trim_pairs
         ]
         hull_wire = Wire(connecting_edges + trimmed_edges, sequenced=True)
@@ -8834,11 +8917,14 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
 
         """
         # pylint: disable=too-many-branches
+        if self.wrapped is None or target_object.wrapped is None:
+            raise ValueError("Can't project empty Wires or to empty Shapes")
+
         if not (direction is None) ^ (center is None):
             raise ValueError("One of either direction or center must be provided")
         if direction is not None:
             direction_vector = Vector(direction).normalized()
-            center_point = None
+            center_point = Vector()  # for typing, never used
         else:
             direction_vector = None
             center_point = Vector(center)
