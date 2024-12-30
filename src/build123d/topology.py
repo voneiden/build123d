@@ -4383,7 +4383,9 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
     project_to_viewport = Mixin1D.project_to_viewport
 
     @classmethod
-    def cast(cls, obj: TopoDS_Shape) -> Self:
+    def cast(
+        cls, obj: TopoDS_Shape
+    ) -> Vertex | Edge | Wire | Face | Shell | Solid | Compound:
         "Returns the right type of wrapper, given a OCCT object"
 
         # define the shape lookup table for casting
@@ -4429,10 +4431,14 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         """
 
         if isinstance(obj, Iterable):
-            obj = _make_topods_compound_from_shapes(s.wrapped for s in obj)
+            topods_compound = _make_topods_compound_from_shapes(
+                [s.wrapped for s in obj]
+            )
+        else:
+            topods_compound = obj
 
         super().__init__(
-            obj=obj,
+            obj=topods_compound,
             label=label,
             color=color,
             parent=parent,
@@ -4502,7 +4508,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         logger.debug("Removing parent of %s (%s)", self.label, parent.label)
         if parent.children:
             parent.wrapped = _make_topods_compound_from_shapes(
-                c.wrapped for c in parent.children
+                [c.wrapped for c in parent.children]
             )
         else:
             parent.wrapped = None
@@ -4516,7 +4522,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         """Method call after attaching to `parent`."""
         logger.debug("Updated parent of %s to %s", self.label, parent.label)
         parent.wrapped = _make_topods_compound_from_shapes(
-            c.wrapped for c in parent.children
+            [c.wrapped for c in parent.children]
         )
 
     def _post_detach_children(self, children):
@@ -4525,7 +4531,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             kids = ",".join([child.label for child in children])
             logger.debug("Removing children %s from %s", kids, self.label)
             self.wrapped = _make_topods_compound_from_shapes(
-                c.wrapped for c in self.children
+                [c.wrapped for c in self.children]
             )
         # else:
         #     logger.debug("Removing no children from %s", self.label)
@@ -4541,7 +4547,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             kids = ",".join([child.label for child in children])
             logger.debug("Adding children %s to %s", kids, self.label)
             self.wrapped = _make_topods_compound_from_shapes(
-                c.wrapped for c in self.children
+                [c.wrapped for c in self.children]
             )
         # else:
         #     logger.debug("Adding no children to %s", self.label)
@@ -4557,17 +4563,19 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             self.copy_attributes_to(curve, ["wrapped", "_NodeMixin__children"])
             return curve + other
 
-        summands = [
+        summands = ShapeList(
             shape
             for o in (other if isinstance(other, (list, tuple)) else [other])
             if o is not None
             for shape in o.get_top_level_shapes()
-        ]
+        )
         # If there is nothing to add return the original object
         if not summands:
             return self
 
-        summands = [s for s in self.get_top_level_shapes() + summands if s is not None]
+        summands = ShapeList(
+            s for s in self.get_top_level_shapes() + summands if s is not None
+        )
 
         # Only fuse the parts if necessary
         if len(summands) <= 1:
@@ -4576,10 +4584,12 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             fuse_op = BRepAlgoAPI_Fuse()
             fuse_op.SetFuzzyValue(TOLERANCE)
             self.copy_attributes_to(summands[0], ["wrapped", "_NodeMixin__children"])
-            result = self._bool_op(summands[:1], summands[1:], fuse_op)
-            if isinstance(result, list):
-                result = Compound(result)
+            bool_result = self._bool_op(summands[:1], summands[1:], fuse_op)
+            if isinstance(bool_result, list):
+                result = Compound(bool_result)
                 self.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+            else:
+                result = bool_result
 
         if SkipClean.clean:
             result = result.clean()
@@ -4617,7 +4627,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             sub_compounds = []
         return ShapeList(sub_compounds)
 
-    def compound(self) -> Compound:
+    def compound(self) -> Compound | None:
         """Return the Compound"""
         shape_list = self.compounds()
         entity_count = len(shape_list)
@@ -4650,7 +4660,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
 
     def do_children_intersect(
         self, include_parent: bool = False, tolerance: float = 1e-5
-    ) -> tuple[bool, tuple[Shape, Shape], float]:
+    ) -> tuple[bool, tuple[Shape | None, Shape | None], float]:
         """Do Children Intersect
 
         Determine if any of the child objects within a Compound/assembly intersect by
@@ -4701,7 +4711,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
                             ),
                             common_volume,
                         )
-        return (False, (), 0.0)
+        return (False, (None, None), 0.0)
 
     @classmethod
     def make_text(
@@ -4749,13 +4759,14 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         """
         # pylint: disable=too-many-locals
 
-        def position_face(orig_face: "Face") -> "Face":
+        def position_face(orig_face: Face) -> Face:
             """
             Reposition a face to the provided path
 
             Local coordinates are used to calculate the position of the face
             relative to the path. Global coordinates to position the face.
             """
+            assert text_path is not None
             bbox = orig_face.bounding_box()
             face_bottom_center = Vector((bbox.min.X + bbox.max.X) / 2, 0, 0)
             relative_position_on_wire = (
@@ -4805,9 +4816,9 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         text_flat = Compound(builder.Perform(font_i, NCollection_Utf8String(txt)))
 
         # Align the text from the bounding box
-        align = tuplify(align, 2)
+        align_text = tuplify(align, 2)
         text_flat = text_flat.translate(
-            Vector(*text_flat.bounding_box().to_align_offset(align))
+            Vector(*text_flat.bounding_box().to_align_offset(align_text))
         )
 
         if text_path is not None:
@@ -4965,8 +4976,6 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
 class Part(Compound):
     """A Compound containing 3D objects - aka Solids"""
 
-    _dim = 3
-
     @property
     def _dim(self) -> int:
         return 3
@@ -4974,8 +4983,6 @@ class Part(Compound):
 
 class Sketch(Compound):
     """A Compound containing 2D objects - aka Faces"""
-
-    _dim = 2
 
     @property
     def _dim(self) -> int:
@@ -4985,13 +4992,11 @@ class Sketch(Compound):
 class Curve(Compound):
     """A Compound containing 1D objects - aka Edges"""
 
-    _dim = 1
-
     @property
     def _dim(self) -> int:
         return 1
 
-    __add__ = Mixin1D.__add__
+    __add__ = Mixin1D.__add__  # type: ignore
 
     def __matmul__(self, position: float) -> Vector:
         """Position on curve operator @ - only works if continuous"""
@@ -5005,7 +5010,7 @@ class Curve(Compound):
         """Location on wire operator ^ - only works if continuous"""
         return Wire(self.edges()).location_at(position)
 
-    def wires(self) -> list[Wire]:
+    def wires(self) -> ShapeList[Wire]:  # type: ignore
         """A list of wires created from the edges"""
         return Wire.combine(self.edges())
 
@@ -9570,7 +9575,7 @@ def _make_topods_compound_from_shapes(
 def find_max_dimension(shapes: Shape | Iterable[Shape]) -> float:
     """Return the maximum dimension of one or more shapes"""
     shapes = shapes if isinstance(shapes, Iterable) else [shapes]
-    composite = _make_topods_compound_from_shapes(s.wrapped for s in shapes)
+    composite = _make_topods_compound_from_shapes([s.wrapped for s in shapes])
     bbox = BoundBox.from_topo_ds(composite, tolerance=TOLERANCE, optimal=True)
     return bbox.diagonal
 
