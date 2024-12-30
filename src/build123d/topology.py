@@ -4070,7 +4070,7 @@ class Mixin3D(Shape):
         length: float,
         length2: Optional[float],
         edge_list: Iterable[Edge],
-        face: Face = None,
+        face: Face | None = None,
     ) -> Self:
         """Chamfer
 
@@ -4082,8 +4082,8 @@ class Mixin3D(Shape):
                 chamfer. Should be `None` if not required.
             edge_list (Iterable[Edge]): a list of Edge objects, which must belong to
                 this solid
-            face (Face): identifies the side where length is measured. The edge(s) must be
-                part of the face
+            face (Face, optional): identifies the side where length is measured. The edge(s)
+                must be part of the face
 
         Returns:
             Self:  Chamfered solid
@@ -4286,6 +4286,7 @@ class Mixin3D(Shape):
             ) from err
 
         offset_solid = self.__class__(offset_occt_solid)
+        assert offset_solid.wrapped is not None
 
         # The Solid can be inverted, if so reverse
         if offset_solid.volume < 0:
@@ -4316,9 +4317,9 @@ class Mixin3D(Shape):
         self,
         basis: Optional[Face],
         bounds: list[Union[Face, Wire]],
-        depth: float = None,
+        depth: float | None = None,
         taper: float = 0,
-        up_to_face: Face = None,
+        up_to_face: Face | None = None,
         thru_all: bool = True,
         additive: bool = True,
     ) -> Solid:
@@ -7442,15 +7443,17 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
                 flip = -1 if i > 0 and flip_inner else 1
                 local: Wire = Plane(profile).to_local_coords(wire)
                 local_taper = local.offset_2d(flip * offset_amt, kind=Kind.INTERSECTION)
-                taper = Plane(profile).from_local_coords(local_taper)
-                taper.move(Location(direction))
-                taper_wires.append(taper)
+                taper_wire: Wire = Plane(profile).from_local_coords(local_taper)
+                taper_wire.move(Location(direction))
+                taper_wires.append(taper_wire)
 
             solids = [
                 Solid.make_loft([p, t]) for p, t in zip(profile_wires, taper_wires)
             ]
             if len(solids) > 1:
-                new_solid = solids[0].cut(*solids[1:])
+                complex_solid = solids[0].cut(*solids[1:])
+                assert isinstance(complex_solid, Solid)  # Can't be a list
+                new_solid = complex_solid
             else:
                 new_solid = solids[0]
 
@@ -7605,39 +7608,47 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
         clipping_objects = [o for o in clipping_objects if o.volume > 1e-9]
 
         if until == Until.NEXT:
-            extrusion = extrusion.cut(target_object)
+            trimmed_extrusion = extrusion.cut(target_object)
+            if isinstance(trimmed_extrusion, ShapeList):
+                closest_extrusion = trimmed_extrusion.sort_by(direction_axis)[0]
+            else:
+                closest_extrusion = trimmed_extrusion
             for clipping_object in clipping_objects:
                 # It's possible for clipping faces to self intersect when they are extruded
                 # thus they could be non manifold which results failed boolean operations
                 #  - so skip these objects
                 try:
-                    extrusion = (
-                        extrusion.cut(clipping_object)
-                        .solids()
-                        .sort_by(direction_axis)[0]
-                    )
+                    extrusion_shapes = closest_extrusion.cut(clipping_object)
                 except Exception:
                     warnings.warn(
                         "clipping error - extrusion may be incorrect",
                         stacklevel=2,
                     )
         else:
-            extrusion_parts = [extrusion.intersect(target_object)]
+            base_part = extrusion.intersect(target_object)
+            if isinstance(base_part, ShapeList):
+                extrusion_parts = base_part
+            elif base_part is None:
+                extrusion_parts = ShapeList()
+            else:
+                extrusion_parts = ShapeList([base_part])
             for clipping_object in clipping_objects:
                 try:
-                    extrusion_parts.append(
-                        extrusion.intersect(clipping_object)
-                        .solids()
-                        .sort_by(direction_axis)[0]
-                    )
+                    clipped_extrusion = extrusion.intersect(clipping_object)
+                    if clipped_extrusion is not None:
+                        extrusion_parts.append(
+                            clipped_extrusion.solids().sort_by(direction_axis)[0]
+                        )
                 except Exception:
                     warnings.warn(
                         "clipping error - extrusion may be incorrect",
                         stacklevel=2,
                     )
-            extrusion = Solid.fuse(*extrusion_parts)
+            extrusion_shapes = Solid.fuse(*extrusion_parts)
 
-        return extrusion
+        result = extrusion_shapes.solids().sort_by(direction_axis)[0]
+
+        return result
 
     @classmethod
     def revolve(
@@ -7754,12 +7765,14 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
 
             shapes.append(Mixin3D.cast(builder.Shape()))
 
-        return_value, inner_shapes = shapes[0], shapes[1:]
+        outer_shape, inner_shapes = shapes[0], shapes[1:]
 
         if inner_shapes:
-            return_value = return_value.cut(*inner_shapes)
+            hollow_outer_shape = outer_shape.cut(*inner_shapes)
+            assert isinstance(hollow_outer_shape, Solid)
+            return hollow_outer_shape
 
-        return return_value
+        return outer_shape
 
     @classmethod
     def sweep_multi(
