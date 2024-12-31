@@ -331,8 +331,6 @@ def topods_dim(topods: TopoDS_Shape) -> int | None:
         sub_dims = {topods_dim(s) for s in get_top_level_topods_shapes(topods)}
         return sub_dims.pop() if len(sub_dims) == 1 else None
 
-    return None
-
 
 HASH_CODE_MAX = 2147483647  # max 32bit signed int, required by OCC.Core.HashCode
 
@@ -588,7 +586,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         """
         # Extract one or more (if a Compound) shape from self
         if self.wrapped is None:
-            shape_stack = []
+            return False
         else:
             shape_stack = get_top_level_topods_shapes(self.wrapped)
         results = []
@@ -1156,29 +1154,29 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return []
         return _topods_entities(self.wrapped, topo_type)
 
-    def _entities_from(
-        self, child_type: Shapes, parent_type: Shapes
-    ) -> Dict[Shape, list[Shape]]:
-        """This function is very slow on M1 macs and is currently unused"""
-        if self.wrapped is None:
-            return {}
+    # def _entities_from(
+    #     self, child_type: Shapes, parent_type: Shapes
+    # ) -> Dict[Shape, list[Shape]]:
+    #     """This function is very slow on M1 macs and is currently unused"""
+    #     if self.wrapped is None:
+    #         return {}
 
-        res = TopTools_IndexedDataMapOfShapeListOfShape()
+    #     res = TopTools_IndexedDataMapOfShapeListOfShape()
 
-        TopExp.MapShapesAndAncestors_s(
-            self.wrapped,
-            Shape.inverse_shape_LUT[child_type],
-            Shape.inverse_shape_LUT[parent_type],
-            res,
-        )
+    #     TopExp.MapShapesAndAncestors_s(
+    #         self.wrapped,
+    #         Shape.inverse_shape_LUT[child_type],
+    #         Shape.inverse_shape_LUT[parent_type],
+    #         res,
+    #     )
 
-        out: Dict[Shape, list[Shape]] = {}
-        for i in range(1, res.Extent() + 1):
-            out[self.__class__.cast(res.FindKey(i))] = [
-                self.__class__.cast(el) for el in res.FindFromIndex(i)
-            ]
+    #     out: Dict[Shape, list[Shape]] = {}
+    #     for i in range(1, res.Extent() + 1):
+    #         out[self.__class__.cast(res.FindKey(i))] = [
+    #             self.__class__.cast(el) for el in res.FindFromIndex(i)
+    #         ]
 
-        return out
+    #     return out
 
     def get_top_level_shapes(self) -> ShapeList[Shape]:
         """
@@ -1239,16 +1237,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
             )
         return shape_list[0] if shape_list else None
 
-    def vertices(self) -> ShapeList[Vertex]:
-        """vertices - all the vertices in this Shape - subclasses may override"""
-        return ShapeList()
-
-    def vertex(self) -> Vertex | None:
-        """Return the Vertex"""
-        return None
+    # Note all sub-classes have vertices and vertex methods
 
     def edges(self) -> ShapeList[Edge]:
-        """edges - all the edges in this Shape"""
+        """edges - all the edges in this Shape - subclasses may override"""
         return ShapeList()
 
     def edge(self) -> Edge | None:
@@ -1423,9 +1415,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Returns:
             Shape: copy of transformed shape with all objects keeping their type
         """
-        new_shape = copy.deepcopy(self, None)
         if self.wrapped is None:
-            return new_shape
+            return self
+        new_shape = copy.deepcopy(self, None)
         transformed = downcast(
             BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
         )
@@ -1450,9 +1442,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
         Returns:
             Shape: a copy of the object, but with geometry transformed
         """
-        new_shape = copy.deepcopy(self, None)
         if self.wrapped is None:
-            return new_shape
+            return self
+        new_shape = copy.deepcopy(self, None)
         transformed = downcast(
             BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True).Shape()
         )
@@ -1962,8 +1954,8 @@ class Shape(NodeMixin, Generic[TOPODS]):
         def process_sides(sides):
             """Process sides to determine if it should be None, a single element,
             a Shell, or a ShapeList."""
-            if not sides:
-                return None
+            # if not sides:
+            #     return None
             if len(sides) == 1:
                 return sides[0]
             # Attempt to create a shell
@@ -2567,15 +2559,15 @@ class ShapeList(list[T]):
                     tol_digits,
                 )
 
-        elif hasattr(group_by, "wrapped") and isinstance(
-            group_by.wrapped, (TopoDS_Edge, TopoDS_Wire)
-        ):
+        elif hasattr(group_by, "wrapped"):
             if group_by.wrapped is None:
-                raise ValueError("Cannot group by an empty Edge or Wire")
+                raise ValueError("Cannot group by an empty object")
 
-            def key_f(obj):
-                pnt1, _pnt2 = group_by.closest_points(obj.center())
-                return round(group_by.param_at_point(pnt1), tol_digits)
+            if isinstance(group_by.wrapped, (TopoDS_Edge, TopoDS_Wire)):
+
+                def key_f(obj):
+                    pnt1, _pnt2 = group_by.closest_points(obj.center())
+                    return round(group_by.param_at_point(pnt1), tol_digits)
 
         elif isinstance(group_by, SortBy):
             if group_by == SortBy.LENGTH:
@@ -2637,22 +2629,22 @@ class ShapeList(list[T]):
                 key=lambda o: (axis_as_location * Location(o.center())).position.Z,
                 reverse=reverse,
             )
-        elif hasattr(sort_by, "wrapped") and isinstance(
-            sort_by.wrapped, (TopoDS_Edge, TopoDS_Wire)
-        ):
+        elif hasattr(sort_by, "wrapped"):
             if sort_by.wrapped is None:
-                raise ValueError("Cannot sort by an empty Edge or Wire")
+                raise ValueError("Cannot sort by an empty object")
 
-            def u_of_closest_center(obj) -> float:
-                """u-value of closest point between object center and sort_by"""
-                assert not isinstance(sort_by, SortBy)
-                pnt1, _pnt2 = sort_by.closest_points(obj.center())
-                return sort_by.param_at_point(pnt1)
+            if isinstance(sort_by.wrapped, (TopoDS_Edge, TopoDS_Wire)):
 
-            # pylint: disable=unnecessary-lambda
-            objects = sorted(
-                self, key=lambda o: u_of_closest_center(o), reverse=reverse
-            )
+                def u_of_closest_center(obj) -> float:
+                    """u-value of closest point between object center and sort_by"""
+                    assert not isinstance(sort_by, SortBy)
+                    pnt1, _pnt2 = sort_by.closest_points(obj.center())
+                    return sort_by.param_at_point(pnt1)
+
+                # pylint: disable=unnecessary-lambda
+                objects = sorted(
+                    self, key=lambda o: u_of_closest_center(o), reverse=reverse
+                )
 
         elif isinstance(sort_by, SortBy):
             if sort_by == SortBy.LENGTH:
