@@ -2393,7 +2393,9 @@ class ShapeList(list[T]):
         def axis_parallel_predicate(axis: Axis, tolerance: float):
             def pred(shape: Shape):
                 if shape.is_planar_face:
-                    assert shape.wrapped is not None and isinstance(shape, Face)
+                    assert shape.wrapped is not None and isinstance(
+                        shape.wrapped, TopoDS_Face
+                    )
                     gp_pnt = gp_Pnt()
                     surface_normal = gp_Vec()
                     u_val, _, v_val, _ = BRepTools.UVBounds_s(shape.wrapped)
@@ -2428,7 +2430,9 @@ class ShapeList(list[T]):
 
             def pred(shape: Shape):
                 if shape.is_planar_face:
-                    assert shape.wrapped is not None and isinstance(shape, Face)
+                    assert shape.wrapped is not None and isinstance(
+                        shape.wrapped, TopoDS_Face
+                    )
                     gp_pnt: gp_Pnt = gp_Pnt()
                     surface_normal: gp_Vec = gp_Vec()
                     u_val, _, v_val, _ = BRepTools.UVBounds_s(shape.wrapped)
