@@ -167,11 +167,11 @@ from OCP.Geom import (
     Geom_Line,
 )
 from OCP.GeomAdaptor import GeomAdaptor_Curve
-from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS
 from OCP.Geom2d import Geom2d_Curve, Geom2d_Line, Geom2d_TrimmedCurve
 from OCP.Geom2dAPI import Geom2dAPI_InterCurveCurve
 from OCP.GeomAbs import GeomAbs_C0, GeomAbs_Intersection, GeomAbs_JoinType
 from OCP.GeomAPI import (
+    GeomAPI_IntCS,
     GeomAPI_Interpolate,
     GeomAPI_PointsToBSpline,
     GeomAPI_PointsToBSplineSurface,
@@ -589,8 +589,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         # Extract one or more (if a Compound) shape from self
         if self.wrapped is None:
             return False
-        else:
-            shape_stack = get_top_level_topods_shapes(self.wrapped)
+        shape_stack = get_top_level_topods_shapes(self.wrapped)
 
         while shape_stack:
             shape = shape_stack.pop(0)
@@ -890,9 +889,11 @@ class Shape(NodeMixin, Generic[TOPODS]):
             )
         return [loc * self for loc in other]
 
-    @abstractmethod
-    def center(self, *args, **kwargs) -> Vector:
-        """All of the derived classes from Shape need a center method"""
+    # Actually creating the abstract method causes the subclass to pass center_of
+    # even when not required - possibly this could be improved.
+    # @abstractmethod
+    # def center(self, center_of: CenterOf) -> Vector:
+    #     """Compute the center with a specific type of calculation."""
 
     def clean(self) -> Self:
         """clean
@@ -1768,7 +1769,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         shape_intersections = self._bool_op((self,), objs, intersect_op)
         if isinstance(shape_intersections, ShapeList) and not shape_intersections:
             return None
-        elif (
+        if (
             not isinstance(shape_intersections, ShapeList)
             and shape_intersections.is_null()
         ):
@@ -2929,7 +2930,7 @@ class GroupBy(Generic[T, K]):
         return self.group(self.key_f(shape))
 
 
-class Mixin1D(Shape):
+class Mixin1D(Shape, ABC):
     """Methods to add to the Edge and Wire classes"""
 
     def __add__(
@@ -3818,7 +3819,7 @@ class Mixin1D(Shape):
         return (visible_edges, hidden_edges)
 
 
-class Mixin2D(Shape):
+class Mixin2D(Shape, ABC):
     """Additional methods to add to Face and Shell class"""
 
     project_to_viewport = Mixin1D.project_to_viewport
@@ -3924,7 +3925,7 @@ class Mixin2D(Shape):
         return result
 
 
-class Mixin3D(Shape):
+class Mixin3D(Shape, ABC):
     """Additional methods to add to 3D Shape classes"""
 
     project_to_viewport = Mixin1D.project_to_viewport
@@ -5310,7 +5311,7 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
 
             # Find edge intersections
             if (edge_plane := edge.common_plane()) is not None:  # is a 2D edge
-                if edge_plane.z_dir == plane.z_dir or -edge_plane.z_dir == plane.z_dir:
+                if plane.z_dir in (edge_plane.z_dir, -edge_plane.z_dir):
                     edges_common_to_planes.append(edge)
 
         edges.extend(edges_common_to_planes)
@@ -6286,7 +6287,7 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
             pln = Plane(origin, x_dir=Vector(x_dir), z_dir=self.normal_at(origin))
         return Location(pln)
 
-    def center(self, center_of=CenterOf.GEOMETRY) -> Vector:
+    def center(self, center_of: CenterOf = CenterOf.GEOMETRY) -> Vector:
         """Center of Face
 
         Return the center based on center_of
@@ -7992,7 +7993,7 @@ class Vertex(Shape[TopoDS_Vertex]):
         geom_point = BRep_Tool.Pnt_s(self.wrapped)
         return (geom_point.X(), geom_point.Y(), geom_point.Z())
 
-    def center(self, *args, **kwargs) -> Vector:
+    def center(self) -> Vector:
         """The center of a vertex is itself!"""
         return Vector(self)
 
@@ -8457,13 +8458,13 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
 
             edges_uv_values.append((u, v, edge))
 
-        new_edges = []
+        trimmed_edges = []
         for u, v, edge in edges_uv_values:
             if v < start or u > end:  # Edge not needed
                 continue
 
             if start <= u and v <= end:  # keep whole Edge
-                new_edges.append(edge)
+                trimmed_edges.append(edge)
 
             elif start >= u and end <= v:  # Wire trimmed to single Edge
                 u_edge = edge.param_at_point(self.position_at(start))
@@ -8471,19 +8472,19 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
                 u_edge, v_edge = (
                     (v_edge, u_edge) if u_edge > v_edge else (u_edge, v_edge)
                 )
-                new_edges.append(edge.trim(u_edge, v_edge))
+                trimmed_edges.append(edge.trim(u_edge, v_edge))
 
             elif start <= u:  # keep start of Edge
                 u_edge = edge.param_at_point(self.position_at(end))
                 if u_edge != 0:
-                    new_edges.append(edge.trim(0, u_edge))
+                    trimmed_edges.append(edge.trim(0, u_edge))
 
             else:  #  v <= end  keep end of Edge
                 v_edge = edge.param_at_point(self.position_at(start))
                 if v_edge != 1:
-                    new_edges.append(edge.trim(v_edge, 1))
+                    trimmed_edges.append(edge.trim(v_edge, 1))
 
-        return Wire(new_edges)
+        return Wire(trimmed_edges)
 
     def order_edges(self) -> ShapeList[Edge]:
         """Return the edges in self ordered by wire direction and orientation"""
@@ -8743,12 +8744,10 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
             edge1, edge2 = edges
             if edge1 == reference_edge:
                 return edge1, edge2
-            elif edge2 == reference_edge:
+            if edge2 == reference_edge:
                 return edge2, edge1
-            else:
-                raise ValueError("reference edge not in edges")
-        else:
-            return edges
+            raise ValueError("reference edge not in edges")
+        return edges
 
     @classmethod
     def make_rect(
