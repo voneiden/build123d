@@ -331,6 +331,8 @@ def topods_dim(topods: TopoDS_Shape) -> int | None:
         sub_dims = {topods_dim(s) for s in get_top_level_topods_shapes(topods)}
         return sub_dims.pop() if len(sub_dims) == 1 else None
 
+    return None
+
 
 HASH_CODE_MAX = 2147483647  # max 32bit signed int, required by OCC.Core.HashCode
 
@@ -2143,7 +2145,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
             params,
         )
 
-        return self.__class__(result)
+        return self.__class__.cast(result)
 
     def to_vtk_poly_data(
         self,
@@ -4148,11 +4150,8 @@ class Mixin3D(Shape):
         if center_of == CenterOf.MASS:
             properties = GProp_GProps()
             calc_function = Shape.shape_properties_LUT[shapetype(self.wrapped)]
-            if calc_function:
-                calc_function(self.wrapped, properties)
-                middle = Vector(properties.CentreOfMass())
-            else:
-                raise NotImplementedError
+            calc_function(self.wrapped, properties)
+            middle = Vector(properties.CentreOfMass())
         elif center_of == CenterOf.BOUNDING_BOX:
             middle = self.bounding_box().center()
         return middle
@@ -4207,10 +4206,10 @@ class Mixin3D(Shape):
         shell_builder.Build()
 
         if faces:
-            return_value = self.__class__(shell_builder.Shape())
+            return_value = self.__class__.cast(shell_builder.Shape())
 
         else:  # if no faces provided a watertight solid will be constructed
-            shell1 = self.__class__(shell_builder.Shape()).shells()[0].wrapped
+            shell1 = self.__class__.cast(shell_builder.Shape()).shells()[0].wrapped
             shell2 = self.shells()[0].wrapped
 
             # s1 can be outer or inner shell depending on the thickness sign
@@ -4220,7 +4219,7 @@ class Mixin3D(Shape):
                 sol = BRepBuilderAPI_MakeSolid(shell2, shell1)
 
             # fix needed for the orientations
-            return_value = self.__class__(sol.Shape()).fix()
+            return_value = self.__class__.cast(sol.Shape()).fix()
 
         return return_value
 
@@ -4281,7 +4280,7 @@ class Mixin3D(Shape):
                 "offset Error, an alternative kind may resolve this error"
             ) from err
 
-        offset_solid = self.__class__(offset_occt_solid)
+        offset_solid = self.__class__.cast(offset_occt_solid)
         assert offset_solid.wrapped is not None
 
         # The Solid can be inverted, if so reverse
@@ -6738,7 +6737,7 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
 
         fillet_builder.Build()
 
-        return self.__class__(fillet_builder.Shape())
+        return self.__class__.cast(fillet_builder.Shape())
 
     def chamfer_2d(
         self,
@@ -6794,7 +6793,7 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
             )
 
         chamfer_builder.Build()
-        return self.__class__(chamfer_builder.Shape()).fix()
+        return self.__class__.cast(chamfer_builder.Shape()).fix()
 
     def is_coplanar(self, plane: Plane) -> bool:
         """Is this planar face coplanar with the provided plane"""
@@ -6943,7 +6942,7 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
         if self.wrapped is None:
             raise ValueError("Cannot approximate an empty shape")
 
-        return self.__class__(BRepAlgo.ConvertFace_s(self.wrapped, tolerance))
+        return self.__class__.cast(BRepAlgo.ConvertFace_s(self.wrapped, tolerance))
 
 
 class Shell(Mixin2D, Shape[TopoDS_Shell]):
@@ -7693,18 +7692,18 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
         cls,
         builder: BRepOffsetAPI_MakePipeShell,
         path: Union[Wire, Edge],
-        mode: Union[Vector, Wire, Edge],
+        binormal: Union[Vector, Wire, Edge],
     ) -> bool:
         rotate = False
 
-        if isinstance(mode, Vector):
+        if isinstance(binormal, Vector):
             coordinate_system = gp_Ax2()
             coordinate_system.SetLocation(path.start_point().to_pnt())
-            coordinate_system.SetDirection(mode.to_dir())
+            coordinate_system.SetDirection(binormal.to_dir())
             builder.SetMode(coordinate_system)
             rotate = True
-        elif isinstance(mode, (Wire, Edge)):
-            builder.SetMode(mode.to_wire().wrapped, True)
+        elif isinstance(binormal, (Wire, Edge)):
+            builder.SetMode(binormal.to_wire().wrapped, True)
 
         return rotate
 
@@ -7782,7 +7781,7 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
         path: Union[Wire, Edge],
         make_solid: bool = True,
         is_frenet: bool = False,
-        mode: Union[Vector, Wire, Edge, None] = None,
+        binormal: Union[Vector, Wire, Edge, None] = None,
     ) -> Solid:
         """Multi section sweep
 
@@ -7793,7 +7792,7 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
             path (Union[Wire, Edge]): The wire to sweep the face resulting from the wires over
             make_solid (bool, optional): Solid or Shell. Defaults to True.
             is_frenet (bool, optional): Select frenet mode. Defaults to False.
-            mode (Union[Vector, Wire, Edge, None], optional): additional sweep mode parameters.
+            binormal (Union[Vector, Wire, Edge, None], optional): additional sweep mode parameters.
                 Defaults to None.
 
         Returns:
@@ -7806,8 +7805,8 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
         translate = False
         rotate = False
 
-        if mode:
-            rotate = cls._set_sweep_mode(builder, path, mode)
+        if binormal:
+            rotate = cls._set_sweep_mode(builder, path, binormal)
         else:
             builder.SetMode(is_frenet)
 
@@ -8641,7 +8640,7 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
         wire_builder.Add(TopoDS.Wire_s(other.wrapped))
         wire_builder.Build()
 
-        return self.__class__(wire_builder.Wire())
+        return self.__class__.cast(wire_builder.Wire())
 
     def fillet_2d(self, radius: float, vertices: Iterable[Vertex]) -> Wire:
         """fillet_2d

@@ -2497,9 +2497,38 @@ class TestMixin3D(DirectApiTestCase):
         face = box.faces().sort_by(Axis.Z)[0]
         self.assertRaises(ValueError, box.chamfer, 0.1, None, edge, face=face)
 
+    @patch.object(Shape, "is_valid", return_value=False)
+    def test_chamfer_invalid_shape_raises_error(self, mock_is_valid):
+        box = Solid.make_box(1, 1, 1)
+
+        # Assert that ValueError is raised
+        with self.assertRaises(ValueError) as chamfer_context:
+            max = box.chamfer(0.1, None, box.edges())
+
+        # Check the error message
+        self.assertEqual(
+            str(chamfer_context.exception),
+            "Failed creating a chamfer, try a smaller length value(s)",
+        )
+
+        # Verify is_valid was called
+        mock_is_valid.assert_called_once()
+
     def test_hollow(self):
         shell_box = Solid.make_box(1, 1, 1).hollow([], thickness=-0.1)
         self.assertAlmostEqual(shell_box.volume, 1 - 0.8**3, 5)
+
+        shell_box = Solid.make_box(1, 1, 1)
+        shell_box = shell_box.hollow(
+            shell_box.faces().filter_by(Axis.Z), thickness=0.1, kind=Kind.INTERSECTION
+        )
+        self.assertAlmostEqual(shell_box.volume, 1 * 1.2**2 - 1**3, 5)
+
+        shell_box = Solid.make_box(1, 1, 1).hollow(
+            [], thickness=0.1, kind=Kind.INTERSECTION
+        )
+        self.assertAlmostEqual(shell_box.volume, 1.2**3 - 1**3, 5)
+
         with self.assertRaises(ValueError):
             Solid.make_box(1, 1, 1).hollow([], thickness=0.1, kind=Kind.TANGENT)
 
@@ -3251,6 +3280,20 @@ class TestShape(DirectApiTestCase):
             box.fillet(0.75, box.edges())
             # invalid_object = box.fillet(0.75, box.edges())
             # invalid_object.max_fillet(invalid_object.edges())
+
+    @patch.object(Shape, "is_valid", return_value=False)
+    def test_max_fillet_invalid_shape_raises_error(self, mock_is_valid):
+        box = Solid.make_box(1, 1, 1)
+
+        # Assert that ValueError is raised
+        with self.assertRaises(ValueError) as max_fillet_context:
+            max = box.max_fillet(box.edges())
+
+        # Check the error message
+        self.assertEqual(str(max_fillet_context.exception), "Invalid Shape")
+
+        # Verify is_valid was called
+        mock_is_valid.assert_called_once()
 
     def test_locate_bb(self):
         bounding_box = Solid.make_cone(1, 2, 1).bounding_box()
@@ -4146,6 +4189,11 @@ class TestSolid(DirectApiTestCase):
         extrusion = Solid.extrude_until(square, box, (0, 0, 1), Until.LAST)
         self.assertAlmostEqual(extrusion.volume, 4, 5)
 
+        square = Face.make_rect(1, 1)
+        box = Solid.make_box(4, 4, 1, Plane((-2, -2, -3)))
+        extrusion = Solid.extrude_until(square, box, (0, 0, 1), Until.PREVIOUS)
+        self.assertAlmostEqual(extrusion.volume, 2, 5)
+
     def test_sweep(self):
         path = Edge.make_spline([(0, 0), (3, 5), (7, -2)])
         section = Wire.make_circle(1, Plane(path @ 0, z_dir=path % 0))
@@ -4159,9 +4207,33 @@ class TestSolid(DirectApiTestCase):
         swept = Solid.sweep(section, path)
         self.assertAlmostEqual(swept.volume, 5 * (1 - 0.1**2), 5)
 
+    def test_sweep_multi(self):
+        f0 = Face.make_rect(1, 1)
+        f1 = Pos(X=10) * Circle(1).face()
+        path = Spline((0, 0), (10, 0), tangents=((0, 0, 1), (0, 0, -1)))
+        binormal = Edge.make_line((0, 1), (10, 1))
+        swept = Solid.sweep_multi([f0, f1], path, is_frenet=True, binormal=binormal)
+        self.assertAlmostEqual(swept.volume, 23.78, 2)
+
+        path = Spline((0, 0), (10, 0), tangents=((0, 0, 1), (1, 0, 0)))
+        swept = Solid.sweep_multi(
+            [f0, f1], path, is_frenet=True, binormal=Vector(5, 0, 1)
+        )
+        self.assertAlmostEqual(swept.volume, 20.75, 2)
+
     def test_constructor(self):
         with self.assertRaises(TypeError):
             Solid(foo="bar")
+
+    def test_offset_3d(self):
+        with self.assertRaises(ValueError):
+            Solid.make_box(1, 1, 1).offset_3d(None, 0.1, kind=Kind.TANGENT)
+
+    def test_revolve(self):
+        r = Solid.revolve(
+            Face.make_rect(1, 1, Plane((10, 0, 0))).wire(), 180, axis=Axis.Y
+        )
+        self.assertEqual(len(r.faces()), 6)
 
 
 class TestSkipClean(unittest.TestCase):
