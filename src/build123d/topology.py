@@ -591,12 +591,10 @@ class Shape(NodeMixin, Generic[TOPODS]):
             return False
         else:
             shape_stack = get_top_level_topods_shapes(self.wrapped)
-        results = []
 
         while shape_stack:
             shape = shape_stack.pop(0)
 
-            result = True
             # Create an empty indexed data map to store the edges and their corresponding faces.
             shape_map = TopTools_IndexedDataMapOfShapeListOfShape()
 
@@ -631,11 +629,9 @@ class Shape(NodeMixin, Generic[TOPODS]):
                 # it means the edge is not shared by exactly two faces, indicating that the
                 # shape is not manifold.
                 if shape_map.FindFromIndex(i + 1).Extent() != 2:
-                    result = False
-                    break
-            results.append(result)
+                    return False
 
-        return all(results)
+        return True
 
     class _DisplayNode(NodeMixin):
         """Used to create anytree structures from TopoDS_Shapes"""
@@ -785,15 +781,19 @@ class Shape(NodeMixin, Generic[TOPODS]):
             result = Shape._show_tree(tree[0], show_center)
         return result
 
-    def __add__(self, other: Shape | Iterable[Shape]) -> Self | ShapeList[Self]:
+    def __add__(self, other: None | Shape | Iterable[Shape]) -> Self | ShapeList[Self]:
         """fuse shape to self operator +"""
         # Convert `other` to list of base objects and filter out None values
-        summands = [
-            shape
-            for o in (other if isinstance(other, (list, tuple)) else [other])
-            if o is not None
-            for shape in o.get_top_level_shapes()
-        ]
+        if other is None:
+            summands = []
+        else:
+            summands = [
+                shape
+                # for o in (other if isinstance(other, (list, tuple)) else [other])
+                for o in ([other] if isinstance(other, Shape) else other)
+                if o is not None
+                for shape in o.get_top_level_shapes()
+            ]
         # If there is nothing to add return the original object
         if not summands:
             return self
@@ -819,30 +819,36 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
         return sum_shape
 
-    def __sub__(self, other: Union[Shape, Iterable[Shape]]) -> Self | ShapeList[Self]:
+    def __sub__(
+        self, other: Union[None, Shape, Iterable[Shape]]
+    ) -> Self | ShapeList[Self]:
         """cut shape from self operator -"""
 
         if self.wrapped is None:
             raise ValueError("Cannot subtract shape from empty compound")
 
         # Convert `other` to list of base objects and filter out None values
-        subtrahends = [
-            shape
-            for o in (other if isinstance(other, (list, tuple)) else [other])
-            if o is not None
-            for shape in o.get_top_level_shapes()
-        ]
+        if other is None:
+            subtrahends = []
+        else:
+            subtrahends = [
+                shape
+                # for o in (other if isinstance(other, (list, tuple)) else [other])
+                for o in ([other] if isinstance(other, Shape) else other)
+                if o is not None
+                for shape in o.get_top_level_shapes()
+            ]
         # If there is nothing to subtract return the original object
         if not subtrahends:
             return self
 
         # Check that all dimensions are the same
         minuend_dim = self._dim
-        if minuend_dim is None:
+        if minuend_dim is None or any(s._dim is None for s in subtrahends):
             raise ValueError("Dimensions of objects to subtract from are inconsistent")
 
         # Check that the operation is valid
-        subtrahend_dims = [s._dim for s in subtrahends]
+        subtrahend_dims = [s._dim for s in subtrahends if s._dim is not None]
         if any(d < minuend_dim for d in subtrahend_dims):
             raise ValueError(
                 f"Only shapes with equal or greater dimension can be subtracted: "
@@ -2926,16 +2932,22 @@ class GroupBy(Generic[T, K]):
 class Mixin1D(Shape):
     """Methods to add to the Edge and Wire classes"""
 
-    def __add__(self, other: Shape | Iterable[Shape]) -> Edge | Wire | ShapeList[Edge]:
+    def __add__(
+        self, other: None | Shape | Iterable[Shape]
+    ) -> Edge | Wire | ShapeList[Edge]:
         """fuse shape to wire/edge operator +"""
 
         # Convert `other` to list of base topods objects and filter out None values
-        summands = [
-            shape
-            for o in (other if isinstance(other, (list, tuple)) else [other])
-            if o is not None
-            for shape in get_top_level_topods_shapes(o.wrapped)
-        ]
+        if other is None:
+            summands = []
+        else:
+            summands = [
+                shape
+                # for o in (other if isinstance(other, (list, tuple)) else [other])
+                for o in ([other] if isinstance(other, Shape) else other)
+                if o is not None
+                for shape in get_top_level_topods_shapes(o.wrapped)
+            ]
         # If there is nothing to add return the original object
         if not summands:
             return self
@@ -4547,7 +4559,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         # else:
         #     logger.debug("Adding no children to %s", self.label)
 
-    def __add__(self, other: Shape | Iterable[Shape]) -> Compound:
+    def __add__(self, other: None | Shape | Iterable[Shape]) -> Compound:
         """Combine other to self `+` operator
 
         Note that if all of the objects are connected Edges/Wires the result
@@ -4558,12 +4570,16 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
             self.copy_attributes_to(curve, ["wrapped", "_NodeMixin__children"])
             return curve + other
 
-        summands = ShapeList(
-            shape
-            for o in (other if isinstance(other, (list, tuple)) else [other])
-            if o is not None
-            for shape in o.get_top_level_shapes()
-        )
+        summands: ShapeList[Shape]
+        if other is None:
+            summands = ShapeList()
+        else:
+            summands = ShapeList(
+                shape
+                for o in ([other] if isinstance(other, Shape) else other)
+                if o is not None
+                for shape in o.get_top_level_shapes()
+            )
         # If there is nothing to add return the original object
         if not summands:
             return self
@@ -4591,7 +4607,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
 
         return result
 
-    def __sub__(self, other: Shape | Iterable[Shape]) -> Compound:
+    def __sub__(self, other: None | Shape | Iterable[Shape]) -> Compound:
         """Cut other to self `-` operator"""
         difference = Shape.__sub__(self, other)
         difference = Compound(
@@ -6773,15 +6789,11 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
         )
 
         for v in vertices:
-            edges = vertex_edge_map.FindFromKey(v.wrapped)
+            edge_list = vertex_edge_map.FindFromKey(v.wrapped)
 
             # Index or iterator access to OCP.TopTools.TopTools_ListOfShape is slow on M1 macs
             # Using First() and Last() to omit
-            edges = [edges.First(), edges.Last()]
-
-            # Need to wrap in b3d objects for comparison to work
-            # ref.wrapped != edge.wrapped but ref == edge
-            edges = [Mixin2D.cast(e) for e in edges]
+            edges = (Edge(edge_list.First()), Edge(edge_list.Last()))
 
             edge1, edge2 = Wire.order_chamfer_edges(reference_edge, edges)
 
@@ -8698,15 +8710,11 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
         )
 
         for v in vertices:
-            edges = vertex_edge_map.FindFromKey(v.wrapped)
+            edge_list = vertex_edge_map.FindFromKey(v.wrapped)
 
             # Index or iterator access to OCP.TopTools.TopTools_ListOfShape is slow on M1 macs
             # Using First() and Last() to omit
-            edges = [edges.First(), edges.Last()]
-
-            # Need to wrap in b3d objects for comparison to work
-            # ref.wrapped != edge.wrapped but ref == edge
-            edges = [Edge(e) for e in edges]
+            edges = (Edge(edge_list.First()), Edge(edge_list.Last()))
 
             edge1, edge2 = Wire.order_chamfer_edges(reference_edge, edges)
 
@@ -8727,16 +8735,20 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
         return Wire(BRepTools.OuterWire_s(chamfered_face))
 
     @staticmethod
-    def order_chamfer_edges(reference_edge, edges) -> tuple[Edge, Edge]:
+    def order_chamfer_edges(
+        reference_edge: Optional[Edge], edges: tuple[Edge, Edge]
+    ) -> tuple[Edge, Edge]:
         """Order the edges of a chamfer relative to a reference Edge"""
         if reference_edge:
-            if reference_edge not in edges:
-                raise ValueError("One or more vertices are not part of edge")
-            edge1 = reference_edge
-            edge2 = [x for x in edges if x != reference_edge][0]
-        else:
             edge1, edge2 = edges
-        return edge1, edge2
+            if edge1 == reference_edge:
+                return edge1, edge2
+            elif edge2 == reference_edge:
+                return edge2, edge1
+            else:
+                raise ValueError("reference edge not in edges")
+        else:
+            return edges
 
     @classmethod
     def make_rect(
@@ -9394,7 +9406,9 @@ def unwrap_topods_compound(
     return compound
 
 
-def get_top_level_topods_shapes(topods_shape: TopoDS_Shape) -> list[TopoDS_Shape]:
+def get_top_level_topods_shapes(
+    topods_shape: TopoDS_Shape | None,
+) -> list[TopoDS_Shape]:
     """
     Retrieve the first level of child shapes from the shape.
 
