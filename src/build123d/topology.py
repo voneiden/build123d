@@ -2930,8 +2930,20 @@ class GroupBy(Generic[T, K]):
         return self.group(self.key_f(shape))
 
 
-class Mixin1D(Shape, ABC):
+class Mixin1D(Shape):
     """Methods to add to the Edge and Wire classes"""
+
+    @classmethod
+    def extrude(
+        cls, obj: Shape, direction: VectorLike
+    ) -> Edge | Face | Shell | Solid | Compound:
+        """Unused - only here because Mixin1D is a subclass of Shape"""
+        return NotImplemented
+
+    @property
+    def _dim(self) -> int:
+        """Dimension of Edges and Wires"""
+        return 1
 
     def __add__(
         self, other: None | Shape | Iterable[Shape]
@@ -3819,8 +3831,20 @@ class Mixin1D(Shape, ABC):
         return (visible_edges, hidden_edges)
 
 
-class Mixin2D(Shape, ABC):
+class Mixin2D(Shape):
     """Additional methods to add to Face and Shell class"""
+
+    @classmethod
+    def extrude(
+        cls, obj: Shape, direction: VectorLike
+    ) -> Edge | Face | Shell | Solid | Compound:
+        """Unused - only here because Mixin1D is a subclass of Shape"""
+        return NotImplemented
+
+    @property
+    def _dim(self) -> int:
+        """Dimension of Faces and Shells"""
+        return 2
 
     project_to_viewport = Mixin1D.project_to_viewport
     split = Mixin1D.split
@@ -3925,8 +3949,20 @@ class Mixin2D(Shape, ABC):
         return result
 
 
-class Mixin3D(Shape, ABC):
+class Mixin3D(Shape):
     """Additional methods to add to 3D Shape classes"""
+
+    @classmethod
+    def extrude(
+        cls, obj: Shape, direction: VectorLike
+    ) -> Edge | Face | Shell | Solid | Compound:
+        """Unused - only here because Mixin1D is a subclass of Shape"""
+        return NotImplemented
+
+    @property
+    def _dim(self) -> int | None:
+        """Dimension of Solids"""
+        return 3
 
     project_to_viewport = Mixin1D.project_to_viewport
     split = Mixin1D.split
@@ -5040,10 +5076,6 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
 
     order = 1.0
 
-    @property
-    def _dim(self) -> int:
-        return 1
-
     def __init__(
         self,
         obj: Optional[TopoDS_Edge | Axis | None] = None,
@@ -6000,10 +6032,6 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
     # pylint: disable=too-many-public-methods
 
     order = 2.0
-
-    @property
-    def _dim(self) -> int:
-        return 2
 
     @overload
     def __init__(
@@ -6969,10 +6997,6 @@ class Shell(Mixin2D, Shape[TopoDS_Shell]):
 
     order = 2.5
 
-    @property
-    def _dim(self) -> int:
-        return 2
-
     def __init__(
         self,
         obj: Optional[TopoDS_Shell | Face | Iterable[Face]] = None,
@@ -7106,10 +7130,6 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
     Solid objects to create or modify complex geometries."""
 
     order = 3.0
-
-    @property
-    def _dim(self) -> int:
-        return 3
 
     def __init__(
         self,
@@ -8125,10 +8145,6 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
     allowing precise definition of paths within a 3D model."""
 
     order = 1.5
-
-    @property
-    def _dim(self) -> int:
-        return 1
 
     @overload
     def __init__(
