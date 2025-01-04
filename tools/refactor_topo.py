@@ -398,6 +398,7 @@ def write_topo_class_files(
         "two_d": ["Mixin2D", "Face", "Shell"],
         "three_d": ["Mixin3D", "Solid"],
         "composite": ["Compound", "Curve", "Sketch", "Part"],
+        "utils": [],
     }
 
     for group_name, class_names in class_groups.items():
@@ -443,8 +444,6 @@ license:
         group_classes = [
             extracted_classes[name] for name in class_names if name in extracted_classes
         ]
-        if not group_classes:
-            continue
 
         # Add imports for base classes based on layer dependencies
         additional_imports = []
