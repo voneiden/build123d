@@ -904,7 +904,7 @@ SplitType = Union[Edge, Wire, Face, Solid]
 
 def split(
     objects: Union[SplitType, Iterable[SplitType]] = None,
-    bisect_by: Union[Plane, Face] = Plane.XZ,
+    bisect_by: Union[Plane, Face, Shell] = Plane.XZ,
     keep: Keep = Keep.TOP,
     mode: Mode = Mode.REPLACE,
 ):
@@ -937,7 +937,16 @@ def split(
 
     new_objects = []
     for obj in object_list:
-        new_objects.append(obj.split(bisect_by, keep))
+        bottom = None
+        if keep == Keep.BOTH:
+            top, bottom = obj.split(bisect_by, keep)
+        else:
+            top = obj.split(bisect_by, keep)
+        for subpart in [top, bottom]:
+            if isinstance(subpart, Iterable):
+                new_objects.extend(subpart)
+            elif subpart is not None:
+                new_objects.append(subpart)
 
     if context is not None:
         context._add_to_context(*new_objects, mode=mode)

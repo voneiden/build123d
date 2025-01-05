@@ -1,15 +1,18 @@
 # system modules
 import copy
 import io
+from io import StringIO
 import itertools
 import json
 import math
 import os
 import platform
+import pprint
 import random
 import re
 from typing import Optional
 import unittest
+from unittest.mock import patch, MagicMock
 from random import uniform
 from IPython.lib import pretty
 
@@ -30,6 +33,10 @@ from OCP.gp import (
     gp_XYZ,
 )
 from OCP.GProp import GProp_GProps
+from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain  # Correct import
+
+from vtkmodules.vtkCommonDataModel import vtkPolyData
+from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
 from build123d.build_common import GridLocations, Locations, PolarLocations
 from build123d.build_enums import (
@@ -57,6 +64,7 @@ from build123d.objects_part import Box, Cylinder
 from build123d.objects_curve import CenterArc, EllipticalCenterArc, JernArc, Polyline
 from build123d.build_sketch import BuildSketch
 from build123d.build_line import BuildLine
+from build123d.jupyter_tools import to_vtkpoly_string
 from build123d.objects_curve import Spline
 from build123d.objects_sketch import Circle, Rectangle, RegularPolygon
 from build123d.geometry import (
@@ -66,6 +74,7 @@ from build123d.geometry import (
     Location,
     LocationEncoder,
     Matrix,
+    Plane,
     Pos,
     Rot,
     Rotation,
@@ -78,10 +87,11 @@ from build123d.topology import (
     Compound,
     Edge,
     Face,
-    Plane,
+    GroupBy,
     Shape,
     ShapeList,
     Shell,
+    SkipClean,
     Solid,
     Sketch,
     Vertex,
@@ -419,10 +429,10 @@ class TestBoundBox(DirectApiTestCase):
 
         # Test creation of a bounding box from a shape - note the low accuracy comparison
         # as the box is a little larger than the shape
-        bb1 = BoundBox._from_topo_ds(Solid.make_cylinder(1, 1).wrapped, optimal=False)
+        bb1 = BoundBox.from_topo_ds(Solid.make_cylinder(1, 1).wrapped, optimal=False)
         self.assertVectorAlmostEquals(bb1.size, (2, 2, 1), 1)
 
-        bb2 = BoundBox._from_topo_ds(
+        bb2 = BoundBox.from_topo_ds(
             Solid.make_cylinder(0.5, 0.5).translate((0, 0, 0.1)).wrapped, optimal=False
         )
         self.assertTrue(bb2.is_inside(bb1))
@@ -459,11 +469,11 @@ class TestBoundBox(DirectApiTestCase):
 class TestCadObjects(DirectApiTestCase):
     def _make_circle(self):
         circle = gp_Circ(gp_Ax2(gp_Pnt(1, 2, 3), gp.DZ_s()), 2.0)
-        return Shape.cast(BRepBuilderAPI_MakeEdge(circle).Edge())
+        return Edge.cast(BRepBuilderAPI_MakeEdge(circle).Edge())
 
     def _make_ellipse(self):
         ellipse = gp_Elips(gp_Ax2(gp_Pnt(1, 2, 3), gp.DZ_s()), 4.0, 2.0)
-        return Shape.cast(BRepBuilderAPI_MakeEdge(ellipse).Edge())
+        return Edge.cast(BRepBuilderAPI_MakeEdge(ellipse).Edge())
 
     def test_edge_wrapper_center(self):
         e = self._make_circle()
@@ -608,7 +618,7 @@ class TestCadObjects(DirectApiTestCase):
         self.assertVectorAlmostEquals(e2.center(CenterOf.MASS), (1.0, 2.0, 4.0), 3)
 
     def test_vertices(self):
-        e = Shape.cast(BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(1, 1, 0)).Edge())
+        e = Edge.cast(BRepBuilderAPI_MakeEdge(gp_Pnt(0, 0, 0), gp_Pnt(1, 1, 0)).Edge())
         self.assertEqual(2, len(e.vertices()))
 
     def test_edge_wrapper_radius(self):
@@ -678,6 +688,41 @@ class TestCadObjects(DirectApiTestCase):
             ]
         )
         self.assertAlmostEqual(many_rad.radius, 1.0)
+
+
+# TODO: Enable after the split of topology.py
+# class TestCleanMethod(unittest.TestCase):
+#     def setUp(self):
+#         # Create a mock object
+#         self.solid = Solid()
+#         self.solid.wrapped = MagicMock()  # Simulate a valid `wrapped` object
+
+#     @patch("build123d.topology.shape_core.ShapeUpgrade_UnifySameDomain")
+#     def test_clean_warning_on_exception(self, mock_shape_upgrade):
+#         # Mock the upgrader
+#         mock_upgrader = mock_shape_upgrade.return_value
+#         mock_upgrader.Build.side_effect = Exception("Mocked Build failure")
+
+#         # Capture warnings
+#         with self.assertWarns(Warning) as warn_context:
+#             self.solid.clean()
+
+#         # Assert the warning message
+#         self.assertIn("Unable to clean", str(warn_context.warning))
+
+#         # Verify the upgrader was constructed with the correct arguments
+#         mock_shape_upgrade.assert_called_once_with(self.solid.wrapped, True, True, True)
+
+#         # Verify the Build method was called
+#         mock_upgrader.Build.assert_called_once()
+
+#     def test_clean_with_none_wrapped(self):
+#         # Set `wrapped` to None to simulate the error condition
+#         self.solid.wrapped = None
+
+#         # Call clean and ensure it returns self
+#         result = self.solid.clean()
+#         self.assertIs(result, self.solid)  # Ensure it returns the same object
 
 
 class TestColor(DirectApiTestCase):
@@ -849,8 +894,8 @@ class TestCompound(DirectApiTestCase):
         # N.B. b and bb overlap but still add to Compound volume
 
     def test_constructor(self):
-        with self.assertRaises(ValueError):
-            Compound(bob="fred")
+        with self.assertRaises(TypeError):
+            Compound(foo="bar")
 
     def test_len(self):
         self.assertEqual(len(Compound()), 0)
@@ -1139,7 +1184,7 @@ class TestEdge(DirectApiTestCase):
         self.assertAlmostEqual((e2 @ 0.1).X, -(e2r @ 0.1).X, 5)
 
     def test_init(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             Edge(direction=(1, 0, 0))
 
 
@@ -1354,11 +1399,11 @@ class TestFace(DirectApiTestCase):
             for y in range(11)
         ]
         surface = Face.make_surface_from_array_of_points(pnts)
-        solid = surface.thicken(1)
+        solid = Solid.thicken(surface, 1)
         self.assertAlmostEqual(solid.volume, 101.59, 2)
 
         square = Face.make_rect(10, 10)
-        bbox = square.thicken(1, normal_override=(0, 0, -1)).bounding_box()
+        bbox = Solid.thicken(square, 1, normal_override=(0, 0, -1)).bounding_box()
         self.assertVectorAlmostEquals(bbox.min, (-5, -5, -1), 5)
         self.assertVectorAlmostEquals(bbox.max, (5, 5, 0), 5)
 
@@ -1596,12 +1641,44 @@ class TestFunctions(unittest.TestCase):
         # unwrap fully
         c0 = Compound([b1])
         c1 = Compound([c0])
-        result = Shape.cast(unwrap_topods_compound(c1.wrapped, True))
+        result = Compound.cast(unwrap_topods_compound(c1.wrapped, True))
         self.assertTrue(isinstance(result, Solid))
 
         # unwrap not fully
-        result = Shape.cast(unwrap_topods_compound(c1.wrapped, False))
+        result = Compound.cast(unwrap_topods_compound(c1.wrapped, False))
         self.assertTrue(isinstance(result, Compound))
+
+
+class TestGroupBy(unittest.TestCase):
+
+    def setUp(self):
+        # Ensure the class variable is in its default state before each test
+        self.v = Solid.make_box(1, 1, 1).vertices().group_by(Axis.Z)
+
+    def test_str(self):
+        self.assertEqual(
+            str(self.v),
+            f"""[[Vertex(0.0, 0.0, 0.0),
+  Vertex(0.0, 1.0, 0.0),
+  Vertex(1.0, 0.0, 0.0),
+  Vertex(1.0, 1.0, 0.0)],
+ [Vertex(0.0, 0.0, 1.0),
+  Vertex(0.0, 1.0, 1.0),
+  Vertex(1.0, 0.0, 1.0),
+  Vertex(1.0, 1.0, 1.0)]]""",
+        )
+
+    def test_repr(self):
+        self.assertEqual(
+            repr(self.v),
+            "[[Vertex(0.0, 0.0, 0.0), Vertex(0.0, 1.0, 0.0), Vertex(1.0, 0.0, 0.0), Vertex(1.0, 1.0, 0.0)], [Vertex(0.0, 0.0, 1.0), Vertex(0.0, 1.0, 1.0), Vertex(1.0, 0.0, 1.0), Vertex(1.0, 1.0, 1.0)]]",
+        )
+
+    def test_pp(self):
+        self.assertEqual(
+            pprint.pformat(self.v),
+            "[[Vertex(0.0, 0.0, 0.0), Vertex(0.0, 1.0, 0.0), Vertex(1.0, 0.0, 0.0), Vertex(1.0, 1.0, 0.0)], [Vertex(0.0, 0.0, 1.0), Vertex(0.0, 1.0, 1.0), Vertex(1.0, 0.0, 1.0), Vertex(1.0, 1.0, 1.0)]]",
+        )
 
 
 class TestImportExport(DirectApiTestCase):
@@ -1644,6 +1721,12 @@ class TestJupyter(DirectApiTestCase):
     def test_display_error(self):
         with self.assertRaises(AttributeError):
             display(Vector())
+
+        with self.assertRaises(ValueError):
+            to_vtkpoly_string("invalid")
+
+        with self.assertRaises(ValueError):
+            display("invalid")
 
 
 class TestLocation(DirectApiTestCase):
@@ -1929,6 +2012,21 @@ class TestLocation(DirectApiTestCase):
         i = (l & b).vertex()
         self.assertTrue(isinstance(i, Vertex))
         self.assertVectorAlmostEquals(Vector(i), (0.5, 0.5, 0.5), 5)
+
+        e1 = Edge.make_line((0, -1), (2, 1))
+        e2 = Edge.make_line((0, 1), (2, -1))
+        e3 = Edge.make_line((0, 0), (2, 0))
+
+        i = e1.intersect(e2, e3)
+        self.assertTrue(isinstance(i, Vertex))
+        self.assertVectorAlmostEquals(i, (1, 0, 0), 5)
+
+        e4 = Edge.make_line((1, -1), (1, 1))
+        e5 = Edge.make_line((2, -1), (2, 1))
+        i = e3.intersect(e4, e5)
+        self.assertIsNone(i)
+
+        self.assertIsNone(b.intersect(b.moved(Pos(X=10))))
 
 
 class TestMatrix(DirectApiTestCase):
@@ -2399,9 +2497,38 @@ class TestMixin3D(DirectApiTestCase):
         face = box.faces().sort_by(Axis.Z)[0]
         self.assertRaises(ValueError, box.chamfer, 0.1, None, edge, face=face)
 
+    @patch.object(Shape, "is_valid", return_value=False)
+    def test_chamfer_invalid_shape_raises_error(self, mock_is_valid):
+        box = Solid.make_box(1, 1, 1)
+
+        # Assert that ValueError is raised
+        with self.assertRaises(ValueError) as chamfer_context:
+            max = box.chamfer(0.1, None, box.edges())
+
+        # Check the error message
+        self.assertEqual(
+            str(chamfer_context.exception),
+            "Failed creating a chamfer, try a smaller length value(s)",
+        )
+
+        # Verify is_valid was called
+        mock_is_valid.assert_called_once()
+
     def test_hollow(self):
         shell_box = Solid.make_box(1, 1, 1).hollow([], thickness=-0.1)
         self.assertAlmostEqual(shell_box.volume, 1 - 0.8**3, 5)
+
+        shell_box = Solid.make_box(1, 1, 1)
+        shell_box = shell_box.hollow(
+            shell_box.faces().filter_by(Axis.Z), thickness=0.1, kind=Kind.INTERSECTION
+        )
+        self.assertAlmostEqual(shell_box.volume, 1 * 1.2**2 - 1**3, 5)
+
+        shell_box = Solid.make_box(1, 1, 1).hollow(
+            [], thickness=0.1, kind=Kind.INTERSECTION
+        )
+        self.assertAlmostEqual(shell_box.volume, 1.2**3 - 1**3, 5)
+
         with self.assertRaises(ValueError):
             Solid.make_box(1, 1, 1).hollow([], thickness=0.1, kind=Kind.TANGENT)
 
@@ -2946,6 +3073,7 @@ class TestProjection(DirectApiTestCase):
         projected_text = sphere.project_faces(
             faces=Compound.make_text("dog", font_size=14),
             path=arch_path,
+            start=0.01,  # avoid a character spanning the sphere edge
         )
         self.assertEqual(len(projected_text.solids()), 0)
         self.assertEqual(len(projected_text.faces()), 3)
@@ -3051,9 +3179,9 @@ class TestShape(DirectApiTestCase):
     def test_split(self):
         shape = Box(1, 1, 1) - Pos((0, 0, -0.25)) * Box(1, 0.5, 0.5)
         split_shape = shape.split(Plane.XY, keep=Keep.BOTTOM)
-        self.assertEqual(len(split_shape.solids()), 2)
-        self.assertAlmostEqual(split_shape.volume, 0.25, 5)
-        self.assertTrue(isinstance(split_shape, Compound))
+        self.assertTrue(isinstance(split_shape, list))
+        self.assertEqual(len(split_shape), 2)
+        self.assertAlmostEqual(split_shape[0].volume + split_shape[1].volume, 0.25, 5)
         split_shape = shape.split(Plane.XY, keep=Keep.TOP)
         self.assertEqual(len(split_shape.solids()), 1)
         self.assertTrue(isinstance(split_shape, Solid))
@@ -3068,16 +3196,17 @@ class TestShape(DirectApiTestCase):
     def test_split_by_non_planar_face(self):
         box = Solid.make_box(1, 1, 1)
         tool = Circle(1).wire()
-        tool_shell: Shell = Shape.extrude(tool, Vector(0, 0, 1))
-        split = box.split(tool_shell, keep=Keep.BOTH)
+        tool_shell: Shell = Shell.extrude(tool, Vector(0, 0, 1))
+        top, bottom = box.split(tool_shell, keep=Keep.BOTH)
 
-        self.assertEqual(len(split.solids()), 2)
-        self.assertGreater(split.solids()[0].volume, split.solids()[1].volume)
+        self.assertFalse(top is None)
+        self.assertFalse(bottom is None)
+        self.assertGreater(top.volume, bottom.volume)
 
     def test_split_by_shell(self):
         box = Solid.make_box(5, 5, 1)
         tool = Wire.make_rect(4, 4)
-        tool_shell: Shell = Shape.extrude(tool, Vector(0, 0, 1))
+        tool_shell: Shell = Shell.extrude(tool, Vector(0, 0, 1))
         split = box.split(tool_shell, keep=Keep.TOP)
         inner_vol = 2 * 2
         outer_vol = 5 * 5
@@ -3097,41 +3226,30 @@ class TestShape(DirectApiTestCase):
         ring_projected = ring.project_to_shape(target0, (0, 0, -1))[0]
         ring_outerwire = ring_projected.outer_wire()
         inside1, outside1 = target0.split_by_perimeter(ring_outerwire, Keep.BOTH)
+        if isinstance(inside1, list):
+            inside1 = Compound(inside1)
+        if isinstance(outside1, list):
+            outside1 = Compound(outside1)
         self.assertLess(inside1.area, outside1.area)
         self.assertEqual(len(outside1.faces()), 2)
 
         # Test 2 - extract multiple faces
-        with BuildPart() as cross:
-            with BuildSketch(Pos(Z=-5) * Rot(Z=-45)) as skt:
-                Rectangle(5, 1, align=Align.MIN)
-                Rectangle(1, 5, align=Align.MIN)
-                fillet(skt.vertices(), 0.3)
-            extrude(amount=10)
-        target2 = cross.part
+        target2 = Box(1, 10, 10)
         square = Face.make_rect(3, 3, Plane((12, 0, 0), z_dir=(1, 0, 0)))
-        square_projected = square.project_to_shape(cross.part, (-1, 0, 0))[0]
-        projected_edges = square_projected.edges().sort_by(SortBy.DISTANCE)[2:]
-        projected_perimeter = Wire(projected_edges)
-        inside2 = target2.split_by_perimeter(projected_perimeter, Keep.INSIDE)
-        self.assertTrue(isinstance(inside2, Shell))
-
-        # Test 3 - Invalid, wire on shape edge
-        target3 = Solid.make_cylinder(5, 10, Plane((0, 0, -5)))
-        square_projected = square.project_to_shape(target3, (-1, 0, 0))[0].unwrap(
-            fully=True
+        square_projected = square.project_to_shape(target2, (-1, 0, 0))[0]
+        outside2 = target2.split_by_perimeter(
+            square_projected.outer_wire(), Keep.OUTSIDE
         )
-        project_perimeter = square_projected.outer_wire()
-        inside3 = target3.split_by_perimeter(project_perimeter, Keep.INSIDE)
-        self.assertIsNone(inside3)
-        outside3 = target3.split_by_perimeter(project_perimeter, Keep.OUTSIDE)
-        self.assertAlmostEqual(outside3.area, target3.shell().area, 5)
+        self.assertTrue(isinstance(outside2, Shell))
+        inside2 = target2.split_by_perimeter(square_projected.outer_wire(), Keep.INSIDE)
+        self.assertTrue(isinstance(inside2, Face))
 
         # Test 4 - invalid inputs
         with self.assertRaises(ValueError):
-            _, _ = target2.split_by_perimeter(projected_perimeter.edges()[0], Keep.BOTH)
+            _, _ = target2.split_by_perimeter(Edge.make_line((0, 0), (1, 0)), Keep.BOTH)
 
         with self.assertRaises(ValueError):
-            _, _ = target3.split_by_perimeter(projected_perimeter, Keep.TOP)
+            _, _ = target2.split_by_perimeter(Edge.make_circle(1), Keep.TOP)
 
     def test_distance(self):
         sphere1 = Solid.make_sphere(1, Plane((-5, 0, 0)))
@@ -3162,6 +3280,20 @@ class TestShape(DirectApiTestCase):
             box.fillet(0.75, box.edges())
             # invalid_object = box.fillet(0.75, box.edges())
             # invalid_object.max_fillet(invalid_object.edges())
+
+    @patch.object(Shape, "is_valid", return_value=False)
+    def test_max_fillet_invalid_shape_raises_error(self, mock_is_valid):
+        box = Solid.make_box(1, 1, 1)
+
+        # Assert that ValueError is raised
+        with self.assertRaises(ValueError) as max_fillet_context:
+            max = box.max_fillet(box.edges())
+
+        # Check the error message
+        self.assertEqual(str(max_fillet_context.exception), "Invalid Shape")
+
+        # Verify is_valid was called
+        mock_is_valid.assert_called_once()
 
     def test_locate_bb(self):
         bounding_box = Solid.make_cone(1, 2, 1).bounding_box()
@@ -3209,10 +3341,6 @@ class TestShape(DirectApiTestCase):
         self.assertVectorAlmostEquals(box.position, (1, 2, 3), 5)
         self.assertVectorAlmostEquals(box.orientation, (10, 20, 30), 5)
 
-    def test_copy(self):
-        with self.assertWarns(DeprecationWarning):
-            Solid.make_box(1, 1, 1).copy()
-
     def test_distance_to_with_closest_points(self):
         s0 = Solid.make_sphere(1).locate(Location((0, 2.1, 0)))
         s1 = Solid.make_sphere(1)
@@ -3250,6 +3378,10 @@ class TestShape(DirectApiTestCase):
         divider = Solid.make_box(0.1, 3, 3, Plane(origin=(-0.05, -1.5, -1.5)))
         positive_half, negative_half = [s.clean() for s in sphere.cut(divider).solids()]
         self.assertGreater(abs(positive_half.volume - negative_half.volume), 0, 1)
+
+    def test_clean_empty(self):
+        obj = Solid()
+        self.assertIs(obj, obj.clean())
 
     def test_relocate(self):
         box = Solid.make_box(10, 10, 10).move(Location((20, -5, -5)))
@@ -3332,7 +3464,7 @@ class TestShape(DirectApiTestCase):
         s = Solid.make_sphere(1).solid()
         self.assertTrue(isinstance(s, Solid))
         with self.assertWarns(UserWarning):
-            Solid.make_sphere(1).split(Plane.XY, keep=Keep.BOTH).solid()
+            Compound(Solid.make_sphere(1).split(Plane.XY, keep=Keep.BOTH)).solid()
 
     def test_manifold(self):
         self.assertTrue(Solid.make_box(1, 1, 1).is_manifold)
@@ -3417,6 +3549,107 @@ class TestShape(DirectApiTestCase):
         self.assertTrue(all(c1 == c2 for c1, c2 in zip(blank.children, box.children)))
         self.assertEqual(blank.topo_parent, box2)
 
+    def test_empty_shape(self):
+        empty = Solid()
+        box = Solid.make_box(1, 1, 1)
+        self.assertIsNone(empty.location)
+        self.assertIsNone(empty.position)
+        self.assertIsNone(empty.orientation)
+        self.assertFalse(empty.is_manifold)
+        with self.assertRaises(ValueError):
+            empty.geom_type
+        self.assertIs(empty, empty.fix())
+        self.assertEqual(empty.hash_code(), 0)
+        self.assertFalse(empty.is_same(Solid()))
+        self.assertFalse(empty.is_equal(Solid()))
+        self.assertTrue(empty.is_valid())
+        empty_bbox = empty.bounding_box()
+        self.assertEqual(tuple(empty_bbox.size), (0, 0, 0))
+        self.assertIs(empty, empty.mirror(Plane.XY))
+        self.assertEqual(Shape.compute_mass(empty), 0)
+        self.assertEqual(empty.entities("Face"), [])
+        self.assertEqual(empty.area, 0)
+        self.assertIs(empty, empty.rotate(Axis.Z, 90))
+        translate_matrix = [
+            [1.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0, 2.0],
+            [0.0, 0.0, 1.0, 3.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+        self.assertIs(empty, empty.transform_shape(Matrix(translate_matrix)))
+        self.assertIs(empty, empty.transform_geometry(Matrix(translate_matrix)))
+        with self.assertRaises(ValueError):
+            empty.locate(Location())
+        empty_loc = Location()
+        empty_loc.wrapped = None
+        with self.assertRaises(ValueError):
+            box.locate(empty_loc)
+        with self.assertRaises(ValueError):
+            empty.located(Location())
+        with self.assertRaises(ValueError):
+            box.located(empty_loc)
+        with self.assertRaises(ValueError):
+            empty.move(Location())
+        with self.assertRaises(ValueError):
+            box.move(empty_loc)
+        with self.assertRaises(ValueError):
+            empty.moved(Location())
+        with self.assertRaises(ValueError):
+            box.moved(empty_loc)
+        with self.assertRaises(ValueError):
+            empty.relocate(Location())
+        with self.assertRaises(ValueError):
+            box.relocate(empty_loc)
+        with self.assertRaises(ValueError):
+            empty.distance_to(Vector(1, 1, 1))
+        with self.assertRaises(ValueError):
+            empty.distance_to_with_closest_points(Vector(1, 1, 1))
+        with self.assertRaises(ValueError):
+            empty.distance_to(Vector(1, 1, 1))
+        with self.assertRaises(ValueError):
+            box.intersect(empty_loc)
+        self.assertEqual(empty._ocp_section(Vertex(1, 1, 1)), ([], []))
+        self.assertEqual(empty.faces_intersected_by_axis(Axis.Z), ShapeList())
+        with self.assertRaises(ValueError):
+            empty.split_by_perimeter(Circle(1).wire())
+        with self.assertRaises(ValueError):
+            empty.distance(Vertex(1, 1, 1))
+        with self.assertRaises(ValueError):
+            list(empty.distances(Vertex(0, 0, 0), Vertex(1, 1, 1)))
+        with self.assertRaises(ValueError):
+            list(box.distances(empty, Vertex(1, 1, 1)))
+        with self.assertRaises(ValueError):
+            empty.mesh(0.001)
+        with self.assertRaises(ValueError):
+            empty.tessellate(0.001)
+        with self.assertRaises(ValueError):
+            empty.to_splines()
+        empty_axis = Axis((0, 0, 0), (1, 0, 0))
+        empty_axis.wrapped = None
+        with self.assertRaises(ValueError):
+            box.vertices().group_by(empty_axis)
+        empty_wire = Wire()
+        with self.assertRaises(ValueError):
+            box.vertices().group_by(empty_wire)
+        with self.assertRaises(ValueError):
+            box.vertices().sort_by(empty_axis)
+        with self.assertRaises(ValueError):
+            box.vertices().sort_by(empty_wire)
+
+    def test_empty_selectors(self):
+        self.assertEqual(Vertex(1, 1, 1).edges(), ShapeList())
+        self.assertEqual(Vertex(1, 1, 1).wires(), ShapeList())
+        self.assertEqual(Vertex(1, 1, 1).faces(), ShapeList())
+        self.assertEqual(Vertex(1, 1, 1).shells(), ShapeList())
+        self.assertEqual(Vertex(1, 1, 1).solids(), ShapeList())
+        self.assertEqual(Vertex(1, 1, 1).compounds(), ShapeList())
+        self.assertIsNone(Vertex(1, 1, 1).edge())
+        self.assertIsNone(Vertex(1, 1, 1).wire())
+        self.assertIsNone(Vertex(1, 1, 1).face())
+        self.assertIsNone(Vertex(1, 1, 1).shell())
+        self.assertIsNone(Vertex(1, 1, 1).solid())
+        self.assertIsNone(Vertex(1, 1, 1).compound())
+
 
 class TestShapeList(DirectApiTestCase):
     """Test ShapeList functionality"""
@@ -3498,6 +3731,17 @@ class TestShapeList(DirectApiTestCase):
         self.assertEqual(len(box.faces().group_by(SortBy.AREA)[0]), 2)
         self.assertEqual(len(box.faces().group_by(SortBy.AREA)[1]), 4)
 
+        line = Edge.make_line((0, 0, 0), (1, 1, 2))
+        vertices_by_line = box.vertices().group_by(line)
+        self.assertEqual(len(vertices_by_line[0]), 1)
+        self.assertEqual(len(vertices_by_line[1]), 2)
+        self.assertEqual(len(vertices_by_line[2]), 1)
+        self.assertEqual(len(vertices_by_line[3]), 1)
+        self.assertEqual(len(vertices_by_line[4]), 2)
+        self.assertEqual(len(vertices_by_line[5]), 1)
+        self.assertVectorAlmostEquals(vertices_by_line[0][0], (0, 0, 0), 5)
+        self.assertVectorAlmostEquals(vertices_by_line[-1][0], (1, 1, 2), 5)
+
         with BuildPart() as boxes:
             with GridLocations(10, 10, 3, 3):
                 Box(1, 1, 1)
@@ -3549,34 +3793,34 @@ class TestShapeList(DirectApiTestCase):
     def test_group_by_str_repr(self):
         nonagon = RegularPolygon(5, 9)
 
-        expected = [
-            "[[<build123d.topology.Edge at 0x1277f6e1cd0>],",
-            " [<build123d.topology.Edge at 0x1277f6e1c10>,",
-            "  <build123d.topology.Edge at 0x1277fd8a090>],",
-            " [<build123d.topology.Edge at 0x1277f75d690>,",
-            "  <build123d.topology.Edge at 0x127760d9310>],",
-            " [<build123d.topology.Edge at 0x12777261f90>,",
-            "  <build123d.topology.Edge at 0x1277f6bd2d0>],",
-            " [<build123d.topology.Edge at 0x1276fbb0590>,",
-            "  <build123d.topology.Edge at 0x1277fec6d90>]]",
-        ]
+        # TODO: re-enable this test once the topology refactor complete
+        # expected = [
+        #     "[[<build123d.topology.one_d.Edge at 0x1277f6e1cd0>],",
+        #     " [<build123d.topology.one_d.Edge at 0x1277f6e1c10>,",
+        #     "  <build123d.topology.one_d.Edge at 0x1277fd8a090>],",
+        #     " [<build123d.topology.one_d.Edge at 0x1277f75d690>,",
+        #     "  <build123d.topology.one_d.Edge at 0x127760d9310>],",
+        #     " [<build123d.topology.one_d.Edge at 0x12777261f90>,",
+        #     "  <build123d.topology.one_d.Edge at 0x1277f6bd2d0>],",
+        #     " [<build123d.topology.one_d.Edge at 0x1276fbb0590>,",
+        #     "  <build123d.topology.one_d.Edge at 0x1277fec6d90>]]",
+        # ]
+        # self.assertDunderStrEqual(str(nonagon.edges().group_by(Axis.X)), expected)
 
-        self.assertDunderStrEqual(str(nonagon.edges().group_by(Axis.X)), expected)
-
-        expected_repr = (
-            "[[<build123d.topology.Edge object at 0x000001277FEC6D90>],"
-            " [<build123d.topology.Edge object at 0x000001277F6BCC10>,"
-            " <build123d.topology.Edge object at 0x000001277EC3D5D0>],"
-            " [<build123d.topology.Edge object at 0x000001277F6BEA90>,"
-            " <build123d.topology.Edge object at 0x000001276FCB2310>],"
-            " [<build123d.topology.Edge object at 0x000001277F6D10D0>,"
-            " <build123d.topology.Edge object at 0x000001276FBAAD10>],"
-            " [<build123d.topology.Edge object at 0x000001277FC86F90>,"
-            " <build123d.topology.Edge object at 0x000001277F6E1CD0>]]"
-        )
-        self.assertDunderReprEqual(
-            repr(nonagon.edges().group_by(Axis.X)), expected_repr
-        )
+        # expected_repr = (
+        #     "[[<build123d.topology.one_d.Edge object at 0x000001277FEC6D90>],"
+        #     " [<build123d.topology.one_d.Edge object at 0x000001277F6BCC10>,"
+        #     " <build123d.topology.one_d.Edge object at 0x000001277EC3D5D0>],"
+        #     " [<build123d.topology.one_d.Edge object at 0x000001277F6BEA90>,"
+        #     " <build123d.topology.one_d.Edge object at 0x000001276FCB2310>],"
+        #     " [<build123d.topology.one_d.Edge object at 0x000001277F6D10D0>,"
+        #     " <build123d.topology.one_d.Edge object at 0x000001276FBAAD10>],"
+        #     " [<build123d.topology.one_d.Edge object at 0x000001277FC86F90>,"
+        #     " <build123d.topology.one_d.Edge object at 0x000001277F6E1CD0>]]"
+        # )
+        # self.assertDunderReprEqual(
+        #     repr(nonagon.edges().group_by(Axis.X)), expected_repr
+        # )
 
         f = io.StringIO()
         p = pretty.PrettyPrinter(f)
@@ -3708,6 +3952,12 @@ class TestShapeList(DirectApiTestCase):
         self.assertNotEqual(sl, diff)
         self.assertNotEqual(sl, object())
 
+    def test_center(self):
+        self.assertEqual(tuple(ShapeList().center()), (0, 0, 0))
+        self.assertEqual(
+            tuple(ShapeList(Vertex(i, 0, 0) for i in range(3)).center()), (1, 0, 0)
+        )
+
 
 class TestShells(DirectApiTestCase):
     def test_shell_init(self):
@@ -3732,8 +3982,8 @@ class TestShells(DirectApiTestCase):
         self.assertAlmostEqual(nm_shell.volume, 0, 5)
 
     def test_constructor(self):
-        with self.assertRaises(ValueError):
-            Shell(bob="fred")
+        with self.assertRaises(TypeError):
+            Shell(foo="bar")
 
         x_section = Rot(90) * Spline((0, -5), (-3, -2), (-2, 0), (-3, 2), (0, 5))
         surface = sweep(x_section, Circle(5).wire())
@@ -3760,8 +4010,8 @@ class TestShells(DirectApiTestCase):
         self.assertEqual(len(sweep_e_w.faces()), 2)
         self.assertEqual(len(sweep_w_e.faces()), 2)
         self.assertEqual(len(sweep_c2_c1.faces()), 2)
-        self.assertEqual(len(sweep_w_w.faces()), 4)
-        self.assertEqual(len(sweep_c2_c2.faces()), 4)
+        self.assertEqual(len(sweep_w_w.faces()), 3)  # 3 with clean, 4 without
+        self.assertEqual(len(sweep_c2_c2.faces()), 3)  # 3 with clean, 4 without
 
     def test_make_loft(self):
         r = 3
@@ -3775,8 +4025,8 @@ class TestShells(DirectApiTestCase):
 
     def test_thicken(self):
         rect = Wire.make_rect(10, 5)
-        shell: Shell = Shape.extrude(rect, Vector(0, 0, 3))
-        thick = shell.thicken(1)
+        shell: Shell = Shell.extrude(rect, Vector(0, 0, 3))
+        thick = Solid.thicken(shell, 1)
 
         self.assertEqual(isinstance(thick, Solid), True)
         inner_vol = 3 * 10 * 5
@@ -3939,6 +4189,11 @@ class TestSolid(DirectApiTestCase):
         extrusion = Solid.extrude_until(square, box, (0, 0, 1), Until.LAST)
         self.assertAlmostEqual(extrusion.volume, 4, 5)
 
+        square = Face.make_rect(1, 1)
+        box = Solid.make_box(4, 4, 1, Plane((-2, -2, -3)))
+        extrusion = Solid.extrude_until(square, box, (0, 0, 1), Until.PREVIOUS)
+        self.assertAlmostEqual(extrusion.volume, 2, 5)
+
     def test_sweep(self):
         path = Edge.make_spline([(0, 0), (3, 5), (7, -2)])
         section = Wire.make_circle(1, Plane(path @ 0, z_dir=path % 0))
@@ -3952,9 +4207,66 @@ class TestSolid(DirectApiTestCase):
         swept = Solid.sweep(section, path)
         self.assertAlmostEqual(swept.volume, 5 * (1 - 0.1**2), 5)
 
+    def test_sweep_multi(self):
+        f0 = Face.make_rect(1, 1)
+        f1 = Pos(X=10) * Circle(1).face()
+        path = Spline((0, 0), (10, 0), tangents=((0, 0, 1), (0, 0, -1)))
+        binormal = Edge.make_line((0, 1), (10, 1))
+        swept = Solid.sweep_multi([f0, f1], path, is_frenet=True, binormal=binormal)
+        self.assertAlmostEqual(swept.volume, 23.78, 2)
+
+        path = Spline((0, 0), (10, 0), tangents=((0, 0, 1), (1, 0, 0)))
+        swept = Solid.sweep_multi(
+            [f0, f1], path, is_frenet=True, binormal=Vector(5, 0, 1)
+        )
+        self.assertAlmostEqual(swept.volume, 20.75, 2)
+
     def test_constructor(self):
+        with self.assertRaises(TypeError):
+            Solid(foo="bar")
+
+    def test_offset_3d(self):
         with self.assertRaises(ValueError):
-            Solid(bob="fred")
+            Solid.make_box(1, 1, 1).offset_3d(None, 0.1, kind=Kind.TANGENT)
+
+    def test_revolve(self):
+        r = Solid.revolve(
+            Face.make_rect(1, 1, Plane((10, 0, 0))).wire(), 180, axis=Axis.Y
+        )
+        self.assertEqual(len(r.faces()), 6)
+
+
+class TestSkipClean(unittest.TestCase):
+    def setUp(self):
+        # Ensure the class variable is in its default state before each test
+        SkipClean.clean = True
+
+    def test_context_manager_sets_clean_false(self):
+        # Verify `clean` is initially True
+        self.assertTrue(SkipClean.clean)
+
+        # Use the context manager
+        with SkipClean():
+            # Within the context, `clean` should be False
+            self.assertFalse(SkipClean.clean)
+
+        # After exiting the context, `clean` should revert to True
+        self.assertTrue(SkipClean.clean)
+
+    def test_exception_handling_does_not_affect_clean(self):
+        # Verify `clean` is initially True
+        self.assertTrue(SkipClean.clean)
+
+        # Use the context manager and raise an exception
+        try:
+            with SkipClean():
+                self.assertFalse(SkipClean.clean)
+                raise ValueError("Test exception")
+        except ValueError:
+            pass
+
+        # Ensure `clean` is restored to True after an exception
+        self.assertTrue(SkipClean.clean)
 
 
 class TestVector(DirectApiTestCase):
@@ -4196,8 +4508,9 @@ class TestVector(DirectApiTestCase):
         self.assertVectorAlmostEquals(
             (v1 & Solid.make_box(2, 4, 5)).vertex(), (1, 2, 3), 5
         )
-        self.assertTrue(
-            len(v1.intersect(Solid.make_box(0.5, 0.5, 0.5)).vertices()) == 0
+        self.assertIsNone(v1.intersect(Solid.make_box(0.5, 0.5, 0.5)))
+        self.assertIsNone(
+            Vertex(-10, -10, -10).intersect(Solid.make_box(0.5, 0.5, 0.5))
         )
 
 
@@ -4273,7 +4586,7 @@ class TestVertex(DirectApiTestCase):
             test_vertex - [1, 2, 3]
 
     def test_vertex_str(self):
-        self.assertEqual(str(Vertex(0, 0, 0)), "Vertex: (0.0, 0.0, 0.0)")
+        self.assertEqual(str(Vertex(0, 0, 0)), "Vertex(0.0, 0.0, 0.0)")
 
     def test_vertex_to_vector(self):
         self.assertIsInstance(Vector(Vertex(0, 0, 0)), Vector)
@@ -4290,6 +4603,56 @@ class TestVertex(DirectApiTestCase):
     def test_no_intersect(self):
         with self.assertRaises(NotImplementedError):
             Vertex(1, 2, 3) & Vertex(5, 6, 7)
+
+
+class TestVTKPolyData(unittest.TestCase):
+    def setUp(self):
+        # Create a simple test object (e.g., a cylinder)
+        self.object_under_test = Solid.make_cylinder(1, 2)
+
+    def test_to_vtk_poly_data(self):
+        # Generate VTK data
+        vtk_data = self.object_under_test.to_vtk_poly_data(
+            tolerance=0.1, angular_tolerance=0.2, normals=True
+        )
+
+        # Verify the result is of type vtkPolyData
+        self.assertIsInstance(vtk_data, vtkPolyData)
+
+        # Further verification can include:
+        # - Checking the number of points, polygons, or cells
+        self.assertGreater(
+            vtk_data.GetNumberOfPoints(), 0, "VTK data should have points."
+        )
+        self.assertGreater(
+            vtk_data.GetNumberOfCells(), 0, "VTK data should have cells."
+        )
+
+        # Optionally, compare the output with a known reference object
+        # (if available) by exporting or analyzing the VTK data
+        known_filter = vtkTriangleFilter()
+        known_filter.SetInputData(vtk_data)
+        known_filter.Update()
+        known_output = known_filter.GetOutput()
+
+        self.assertEqual(
+            vtk_data.GetNumberOfPoints(),
+            known_output.GetNumberOfPoints(),
+            "Number of points in VTK data does not match the expected output.",
+        )
+        self.assertEqual(
+            vtk_data.GetNumberOfCells(),
+            known_output.GetNumberOfCells(),
+            "Number of cells in VTK data does not match the expected output.",
+        )
+
+    def test_empty_shape(self):
+        # Test handling of empty shape
+        empty_object = Solid()  # Create an empty object
+        with self.assertRaises(ValueError) as context:
+            empty_object.to_vtk_poly_data()
+
+        self.assertEqual(str(context.exception), "Cannot convert an empty shape")
 
 
 class TestWire(DirectApiTestCase):

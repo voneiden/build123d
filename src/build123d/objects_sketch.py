@@ -43,6 +43,7 @@ from build123d.geometry import (
     Vector,
     VectorLike,
     to_align_offset,
+    TOLERANCE,
 )
 from build123d.topology import (
     Compound,
@@ -52,7 +53,6 @@ from build123d.topology import (
     Sketch,
     Wire,
     tuplify,
-    TOLERANCE,
     topo_explore_common_vertex,
 )
 

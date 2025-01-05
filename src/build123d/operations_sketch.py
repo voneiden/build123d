@@ -40,9 +40,8 @@ from build123d.topology import (
     Sketch,
     topo_explore_connected_edges,
     topo_explore_common_vertex,
-    TOLERANCE,
 )
-from build123d.geometry import Vector
+from build123d.geometry import Vector, TOLERANCE
 from build123d.build_common import flatten_sequence, validate_inputs
 from build123d.build_sketch import BuildSketch
 from scipy.spatial import Voronoi
@@ -306,4 +305,9 @@ def trace(
         context.pending_edges = ShapeList()
 
     combined_faces = Face.fuse(*new_faces) if len(new_faces) > 1 else new_faces[0]
-    return Sketch(combined_faces.wrapped)
+    result = (
+        Sketch(combined_faces)
+        if isinstance(combined_faces, list)
+        else Sketch(combined_faces.wrapped)
+    )
+    return result

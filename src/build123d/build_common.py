@@ -429,23 +429,30 @@ class Builder(ABC):
                 if mode == Mode.ADD:
                     if self._obj is None:
                         if len(typed[self._shape]) == 1:
-                            self._obj = typed[self._shape][0]
+                            combined = typed[self._shape][0]
                         else:
-                            self._obj = (
+                            combined = (
                                 typed[self._shape].pop().fuse(*typed[self._shape])
                             )
                     else:
-                        self._obj = self._obj.fuse(*typed[self._shape])
+                        combined = self._obj.fuse(*typed[self._shape])
                 elif mode == Mode.SUBTRACT:
                     if self._obj is None:
                         raise RuntimeError("Nothing to subtract from")
-                    self._obj = self._obj.cut(*typed[self._shape])
+                    combined = self._obj.cut(*typed[self._shape])
                 elif mode == Mode.INTERSECT:
                     if self._obj is None:
                         raise RuntimeError("Nothing to intersect with")
-                    self._obj = self._obj.intersect(*typed[self._shape])
+                    combined = self._obj.intersect(*typed[self._shape])
                 elif mode == Mode.REPLACE:
-                    self._obj = Compound(list(typed[self._shape]))
+                    combined = self._sub_class(list(typed[self._shape]))
+
+                # If the boolean operation created a list, convert back
+                self._obj = (
+                    self._sub_class(combined)
+                    if isinstance(combined, list)
+                    else combined
+                )
 
                 if self._obj is not None and clean:
                     self._obj = self._obj.clean()

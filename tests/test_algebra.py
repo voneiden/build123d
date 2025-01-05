@@ -1,6 +1,5 @@
 import math
 import unittest
-import pytest
 from build123d import *
 from build123d.topology import Shape
 
@@ -553,7 +552,7 @@ class AlgebraTests(unittest.TestCase):
         self.assertAlmostEqual(l.length, 3, 5)
 
         l2 = e1 + e3
-        self.assertTrue(isinstance(l2, Compound))
+        self.assertTrue(isinstance(l2, list))
 
     def test_curve_plus_nothing(self):
         e1 = Edge.make_line((0, 1), (1, 1))
@@ -626,7 +625,8 @@ class AlgebraTests(unittest.TestCase):
     def test_part_minus_empty(self):
         b = Box(1, 2, 3)
         r = b - Part()
-        self.assertEqual(b.wrapped, r.wrapped)
+        self.assertAlmostEqual(b.volume, r.volume, 5)
+        self.assertEqual(r._dim, 3)
 
     def test_empty_and_part(self):
         b = Box(1, 2, 3)
@@ -660,7 +660,8 @@ class AlgebraTests(unittest.TestCase):
     def test_sketch_minus_empty(self):
         b = Rectangle(1, 2)
         r = b - Sketch()
-        self.assertEqual(b.wrapped, r.wrapped)
+        self.assertAlmostEqual(b.area, r.area, 5)
+        self.assertEqual(r._dim, 2)
 
     def test_empty_and_sketch(self):
         b = Rectangle(1, 3)
@@ -823,6 +824,7 @@ class LocationTests(unittest.TestCase):
             # on plane, located to grid position, and finally rotated
             c_plane = plane * outer_loc * rotations[i]
             s += c_plane * Circle(1)
+            s = Sketch(s.faces())
 
             for loc in PolarLocations(0.8, (i + 3) * 2):
                 # Use polar locations on c_plane

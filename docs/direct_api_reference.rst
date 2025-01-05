@@ -84,18 +84,6 @@ Import/Export
 *************
 Methods and functions specific to exporting and importing build123d objects are defined below.
 
-.. py:module:: topology
-   :noindex:
-
-.. automethod:: Shape.export_brep
-   :noindex:
-.. automethod:: Shape.export_stl
-   :noindex:
-.. automethod:: Shape.export_step
-   :noindex:
-.. automethod:: Shape.export_stl
-   :noindex:
-
 .. py:module:: importers
    :noindex:
 

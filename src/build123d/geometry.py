@@ -450,7 +450,7 @@ class Vector:
 
     def __hash__(self) -> int:
         """Hash of Vector"""
-        return hash(self.X) + hash(self.Y) + hash(self.Z)
+        return hash((round(self.X, 6), round(self.Y, 6), round(self.Z, 6)))
 
     def __copy__(self) -> Vector:
         """Return copy of self"""
@@ -542,7 +542,7 @@ class Vector:
 
 #:TypeVar("VectorLike"): Tuple of float or Vector defining a position in space
 VectorLike = Union[
-    Vector, tuple[float, float], tuple[float, float, float], Iterable[float]
+    Vector, tuple[float, float], tuple[float, float, float], Sequence[float]
 ]
 
 
@@ -861,8 +861,12 @@ class BoundBox:
     """A BoundingBox for a Shape"""
 
     def __init__(self, bounding_box: Bnd_Box) -> None:
-        self.wrapped: Bnd_Box = bounding_box
-        x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
+        if bounding_box.IsVoid():
+            self.wrapped = None
+            x_min, y_min, z_min, x_max, y_max, z_max = (0,) * 6
+        else:
+            self.wrapped: Bnd_Box = bounding_box
+            x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
         self.min = Vector(x_min, y_min, z_min)  #: location of minimum corner
         self.max = Vector(x_max, y_max, z_max)  #: location of maximum corner
         self.size = Vector(x_max - x_min, y_max - y_min, z_max - z_min)  #: overall size
@@ -870,6 +874,8 @@ class BoundBox:
     @property
     def diagonal(self) -> float:
         """body diagonal length (i.e. object maximum size)"""
+        if self.wrapped is None:
+            return 0.0
         return self.wrapped.SquareExtent() ** 0.5
 
     def __repr__(self):
@@ -914,13 +920,14 @@ class BoundBox:
 
         tmp = Bnd_Box()
         tmp.SetGap(tol)
-        tmp.Add(self.wrapped)
+        if self.wrapped is not None:
+            tmp.Add(self.wrapped)
 
         if isinstance(obj, tuple):
             tmp.Update(*obj)
         elif isinstance(obj, Vector):
             tmp.Update(*obj.to_tuple())
-        elif isinstance(obj, BoundBox):
+        elif isinstance(obj, BoundBox) and obj.wrapped is not None:
             tmp.Add(obj.wrapped)
 
         return BoundBox(tmp)
@@ -963,7 +970,7 @@ class BoundBox:
         return result
 
     @classmethod
-    def _from_topo_ds(
+    def from_topo_ds(
         cls,
         shape: TopoDS_Shape,
         tolerance: float = None,
