@@ -1,0 +1,27 @@
+name: benchmarks
+
+on: [workflow_dispatch]
+# on: [push, pull_request, workflow_dispatch]
+jobs:
+
+  tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [
+          # "3.10",
+          # "3.11",
+          "3.12",
+          ]
+        os: [macos-13, macos-14, ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup/
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: benchmark
+        run: |
+          pip install pytest-benchmark
+          python -m pytest --benchmark-only
