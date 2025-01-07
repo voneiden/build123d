@@ -7,16 +7,12 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: python
+    - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
-    - name: install requirements
+    - name: Install Requirements
       shell: bash
       run: |
-        pip install wheel
-        pip install mypy
-        pip install pytest
-        pip install pytest-cov
-        pip install pylint
+        pip install wheel mypy pytest pytest-benchmark pytest-cov pylint 
         pip install .
