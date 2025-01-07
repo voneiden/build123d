@@ -16,3 +16,5 @@ disable=
 
 ignore-paths=
     ./src/build123d/_version.py # Generated
+
+ignored-modules=OCP,vtkmodules,scipy.spatial,ezdxf,anytree,IPython,trianglesolver,scipy,numpy
