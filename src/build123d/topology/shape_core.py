@@ -1,0 +1,3003 @@
+"""
+build123d topology
+
+name: shape_core.py
+by:   Gumyr
+date: January 07, 2025
+
+desc:
+
+This module defines the foundational classes and methods for the build123d CAD library, enabling
+detailed geometric operations and 3D modeling capabilities. It provides a hierarchy of classes
+representing various geometric entities like vertices, edges, wires, faces, shells, solids, and
+compounds. These classes are designed to work seamlessly with the OpenCascade Python bindings,
+leveraging its robust CAD kernel.
+
+Key Features:
+- **Shape Base Class:** Implements core functionalities such as transformations (rotation,
+  translation, scaling), geometric queries, and boolean operations (cut, fuse, intersect).
+- **Custom Utilities:** Includes helper classes like `ShapeList` for advanced filtering, sorting,
+  and grouping of shapes, and `GroupBy` for organizing shapes by specific criteria.
+- **Type Safety:** Extensive use of Python typing features ensures clarity and correctness in type
+  handling.
+- **Advanced Geometry:** Supports operations like finding intersections, computing bounding boxes,
+  projecting faces, and generating triangulated meshes.
+
+The module is designed for extensibility, enabling developers to build complex 3D assemblies and
+perform detailed CAD operations programmatically while maintaining a clean and structured API.
+
+license:
+
+    Copyright 2025 Gumyr
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+"""
+
+from __future__ import annotations
+
+import copy
+import itertools
+import warnings
+from abc import ABC, abstractmethod
+from typing import (
+    cast as tcast,
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    Optional,
+    Protocol,
+    SupportsIndex,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    overload,
+    TYPE_CHECKING,
+)
+
+import OCP.GeomAbs as ga
+import OCP.TopAbs as ta
+from IPython.lib.pretty import pretty, PrettyPrinter
+from OCP.Aspect import Aspect_TOL_SOLID
+from OCP.BOPAlgo import BOPAlgo_GlueEnum
+from OCP.BRep import BRep_Tool
+from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+from OCP.BRepAlgoAPI import (
+    BRepAlgoAPI_BooleanOperation,
+    BRepAlgoAPI_Common,
+    BRepAlgoAPI_Cut,
+    BRepAlgoAPI_Fuse,
+    BRepAlgoAPI_Section,
+    BRepAlgoAPI_Splitter,
+)
+from OCP.BRepBuilderAPI import (
+    BRepBuilderAPI_Copy,
+    BRepBuilderAPI_GTransform,
+    BRepBuilderAPI_MakeEdge,
+    BRepBuilderAPI_MakeFace,
+    BRepBuilderAPI_MakeVertex,
+    BRepBuilderAPI_RightCorner,
+    BRepBuilderAPI_RoundCorner,
+    BRepBuilderAPI_Sewing,
+    BRepBuilderAPI_Transform,
+    BRepBuilderAPI_Transformed,
+)
+from OCP.BRepCheck import BRepCheck_Analyzer
+from OCP.BRepExtrema import BRepExtrema_DistShapeShape
+from OCP.BRepFeat import BRepFeat_SplitShape
+from OCP.BRepGProp import BRepGProp, BRepGProp_Face
+from OCP.BRepIntCurveSurface import BRepIntCurveSurface_Inter
+from OCP.BRepMesh import BRepMesh_IncrementalMesh
+from OCP.BRepTools import BRepTools
+from OCP.Bnd import Bnd_Box
+from OCP.GProp import GProp_GProps
+from OCP.Geom import Geom_Line
+from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf
+from OCP.GeomLib import GeomLib_IsPlanarSurface
+from OCP.IVtkOCC import IVtkOCC_Shape, IVtkOCC_ShapeMesher
+from OCP.IVtkVTK import IVtkVTK_ShapeData
+from OCP.Prs3d import Prs3d_IsoAspect
+from OCP.Quantity import Quantity_Color
+from OCP.ShapeAnalysis import ShapeAnalysis_Curve
+from OCP.ShapeCustom import ShapeCustom, ShapeCustom_RestrictionParameters
+from OCP.ShapeFix import ShapeFix_Shape
+from OCP.ShapeUpgrade import ShapeUpgrade_UnifySameDomain
+from OCP.TopAbs import TopAbs_Orientation, TopAbs_ShapeEnum
+from OCP.TopExp import TopExp, TopExp_Explorer
+from OCP.TopLoc import TopLoc_Location
+from OCP.TopTools import (
+    TopTools_IndexedDataMapOfShapeListOfShape,
+    TopTools_ListOfShape,
+    TopTools_SequenceOfShape,
+)
+from OCP.TopoDS import (
+    TopoDS,
+    TopoDS_Compound,
+    TopoDS_Face,
+    TopoDS_Iterator,
+    TopoDS_Shape,
+    TopoDS_Shell,
+    TopoDS_Solid,
+    TopoDS_Vertex,
+    TopoDS_Edge,
+    TopoDS_Wire,
+)
+from OCP.gce import gce_MakeLin
+from OCP.gp import gp_Ax1, gp_Ax2, gp_Ax3, gp_Dir, gp_Pnt, gp_Trsf, gp_Vec
+from anytree import NodeMixin, RenderTree
+from build123d.build_enums import CenterOf, GeomType, Keep, SortBy, Transition
+from build123d.geometry import (
+    DEG2RAD,
+    TOLERANCE,
+    Axis,
+    BoundBox,
+    Color,
+    Location,
+    Matrix,
+    Plane,
+    Vector,
+    VectorLike,
+    logger,
+)
+from typing_extensions import Self, Literal
+from vtkmodules.vtkCommonDataModel import vtkPolyData
+from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
+
+
+if TYPE_CHECKING:  # pragma: no cover
+    from .zero_d import Vertex  # pylint: disable=R0801
+    from .one_d import Edge, Wire  # pylint: disable=R0801
+    from .two_d import Face, Shell  # pylint: disable=R0801
+    from .three_d import Solid  # pylint: disable=R0801
+    from .composite import Compound, Curve, Sketch, Part  # pylint: disable=R0801
+HASH_CODE_MAX = 2147483647
+Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
+TrimmingTool = Union[Plane, "Shell", "Face"]
+TOPODS = TypeVar("TOPODS", bound=TopoDS_Shape)
+
+
+class Shape(NodeMixin, Generic[TOPODS]):
+    """Shape
+
+    Base class for all CAD objects such as Edge, Face, Solid, etc.
+
+    Args:
+        obj (TopoDS_Shape, optional): OCCT object. Defaults to None.
+        label (str, optional): Defaults to ''.
+        color (Color, optional): Defaults to None.
+        parent (Compound, optional): assembly parent. Defaults to None.
+
+    Attributes:
+        wrapped (TopoDS_Shape): the OCP object
+        label (str): user assigned label
+        color (Color): object color
+        joints (dict[str:Joint]): dictionary of joints bound to this object (Solid only)
+        children (Shape): list of assembly children of this object (Compound only)
+        topo_parent (Shape): assembly parent of this object
+
+    """
+
+    shape_LUT = {
+        ta.TopAbs_VERTEX: "Vertex",
+        ta.TopAbs_EDGE: "Edge",
+        ta.TopAbs_WIRE: "Wire",
+        ta.TopAbs_FACE: "Face",
+        ta.TopAbs_SHELL: "Shell",
+        ta.TopAbs_SOLID: "Solid",
+        ta.TopAbs_COMPOUND: "Compound",
+        ta.TopAbs_COMPSOLID: "CompSolid",
+    }
+
+    shape_properties_LUT = {
+        ta.TopAbs_VERTEX: None,
+        ta.TopAbs_EDGE: BRepGProp.LinearProperties_s,
+        ta.TopAbs_WIRE: BRepGProp.LinearProperties_s,
+        ta.TopAbs_FACE: BRepGProp.SurfaceProperties_s,
+        ta.TopAbs_SHELL: BRepGProp.SurfaceProperties_s,
+        ta.TopAbs_SOLID: BRepGProp.VolumeProperties_s,
+        ta.TopAbs_COMPOUND: BRepGProp.VolumeProperties_s,
+        ta.TopAbs_COMPSOLID: BRepGProp.VolumeProperties_s,
+    }
+
+    inverse_shape_LUT = {v: k for k, v in shape_LUT.items()}
+
+    downcast_LUT = {
+        ta.TopAbs_VERTEX: TopoDS.Vertex_s,
+        ta.TopAbs_EDGE: TopoDS.Edge_s,
+        ta.TopAbs_WIRE: TopoDS.Wire_s,
+        ta.TopAbs_FACE: TopoDS.Face_s,
+        ta.TopAbs_SHELL: TopoDS.Shell_s,
+        ta.TopAbs_SOLID: TopoDS.Solid_s,
+        ta.TopAbs_COMPOUND: TopoDS.Compound_s,
+        ta.TopAbs_COMPSOLID: TopoDS.CompSolid_s,
+    }
+
+    geom_LUT_EDGE: Dict[ga.GeomAbs_CurveType, GeomType] = {
+        ga.GeomAbs_Line: GeomType.LINE,
+        ga.GeomAbs_Circle: GeomType.CIRCLE,
+        ga.GeomAbs_Ellipse: GeomType.ELLIPSE,
+        ga.GeomAbs_Hyperbola: GeomType.HYPERBOLA,
+        ga.GeomAbs_Parabola: GeomType.PARABOLA,
+        ga.GeomAbs_BezierCurve: GeomType.BEZIER,
+        ga.GeomAbs_BSplineCurve: GeomType.BSPLINE,
+        ga.GeomAbs_OffsetCurve: GeomType.OFFSET,
+        ga.GeomAbs_OtherCurve: GeomType.OTHER,
+    }
+    geom_LUT_FACE: Dict[ga.GeomAbs_SurfaceType, GeomType] = {
+        ga.GeomAbs_Plane: GeomType.PLANE,
+        ga.GeomAbs_Cylinder: GeomType.CYLINDER,
+        ga.GeomAbs_Cone: GeomType.CONE,
+        ga.GeomAbs_Sphere: GeomType.SPHERE,
+        ga.GeomAbs_Torus: GeomType.TORUS,
+        ga.GeomAbs_BezierSurface: GeomType.BEZIER,
+        ga.GeomAbs_BSplineSurface: GeomType.BSPLINE,
+        ga.GeomAbs_SurfaceOfRevolution: GeomType.REVOLUTION,
+        ga.GeomAbs_SurfaceOfExtrusion: GeomType.EXTRUSION,
+        ga.GeomAbs_OffsetSurface: GeomType.OFFSET,
+        ga.GeomAbs_OtherSurface: GeomType.OTHER,
+    }
+    _transModeDict = {
+        Transition.TRANSFORMED: BRepBuilderAPI_Transformed,
+        Transition.ROUND: BRepBuilderAPI_RoundCorner,
+        Transition.RIGHT: BRepBuilderAPI_RightCorner,
+    }
+
+    class _DisplayNode(NodeMixin):
+        """Used to create anytree structures from TopoDS_Shapes"""
+
+        def __init__(
+            self,
+            label: str = "",
+            address: int | None = None,
+            position: Vector | Location | None = None,
+            parent: Shape._DisplayNode | None = None,
+        ):
+            self.label = label
+            self.address = address
+            self.position = position
+            self.parent = parent
+            self.children: list[Shape] = []
+
+    _ordered_shapes = [
+        TopAbs_ShapeEnum.TopAbs_COMPOUND,
+        TopAbs_ShapeEnum.TopAbs_SOLID,
+        TopAbs_ShapeEnum.TopAbs_SHELL,
+        TopAbs_ShapeEnum.TopAbs_FACE,
+        TopAbs_ShapeEnum.TopAbs_WIRE,
+        TopAbs_ShapeEnum.TopAbs_EDGE,
+        TopAbs_ShapeEnum.TopAbs_VERTEX,
+    ]
+    # ---- Constructor ----
+
+    def __init__(
+        self,
+        obj: TopoDS_Shape | None = None,
+        label: str = "",
+        color: Color | None = None,
+        parent: Compound | None = None,
+    ):
+        self.wrapped: TOPODS | None = (
+            tcast(Optional[TOPODS], downcast(obj)) if obj is not None else None
+        )
+        self.for_construction = False
+        self.label = label
+        self._color = color
+
+        # parent must be set following children as post install accesses children
+        self.parent = parent
+
+        # Extracted objects like Vertices and Edges may need to know where they came from
+        self.topo_parent: Shape | None = None
+
+    # ---- Properties ----
+
+    # pylint: disable=too-many-instance-attributes, too-many-public-methods
+
+    @property
+    @abstractmethod
+    def _dim(self) -> int | None:
+        """Dimension of the object"""
+
+    @property
+    def area(self) -> float:
+        """area -the surface area of all faces in this Shape"""
+        if self.wrapped is None:
+            return 0.0
+        properties = GProp_GProps()
+        BRepGProp.SurfaceProperties_s(self.wrapped, properties)
+
+        return properties.Mass()
+
+    @property
+    def color(self) -> None | Color:
+        """Get the shape's color.  If it's None, get the color of the nearest
+        ancestor, assign it to this Shape and return this value."""
+        # Find the correct color for this node
+        if self._color is None:
+            # Find parent color
+            current_node: Compound | Shape | None = self
+            while current_node is not None:
+                parent_color = current_node._color
+                if parent_color is not None:
+                    break
+                current_node = current_node.parent
+            node_color = parent_color
+        else:
+            node_color = self._color
+        self._color = node_color  # Set the node's color for next time
+        return node_color
+
+    @color.setter
+    def color(self, value):
+        """Set the shape's color"""
+        self._color = value
+
+    @property
+    def geom_type(self) -> GeomType:
+        """Gets the underlying geometry type.
+
+        Returns:
+            GeomType: The geometry type of the shape
+
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot determine geometry type of an empty shape")
+
+        shape: TopAbs_ShapeEnum = shapetype(self.wrapped)
+
+        if shape == ta.TopAbs_EDGE:
+            geom = Shape.geom_LUT_EDGE[
+                BRepAdaptor_Curve(tcast(TopoDS_Edge, self.wrapped)).GetType()
+            ]
+        elif shape == ta.TopAbs_FACE:
+            geom = Shape.geom_LUT_FACE[
+                BRepAdaptor_Surface(tcast(TopoDS_Face, self.wrapped)).GetType()
+            ]
+        else:
+            geom = GeomType.OTHER
+
+        return geom
+
+    @property
+    def is_manifold(self) -> bool:
+        """is_manifold
+
+        Check if each edge in the given Shape has exactly two faces associated with it
+        (skipping degenerate edges). If so, the shape is manifold.
+
+        Returns:
+            bool: is the shape manifold or water tight
+        """
+        # Extract one or more (if a Compound) shape from self
+        if self.wrapped is None:
+            return False
+        shape_stack = get_top_level_topods_shapes(self.wrapped)
+
+        while shape_stack:
+            shape = shape_stack.pop(0)
+
+            # Create an empty indexed data map to store the edges and their corresponding faces.
+            shape_map = TopTools_IndexedDataMapOfShapeListOfShape()
+
+            # Fill the map with edges and their associated faces in the given shape. Each edge in
+            # the map is associated with a list of faces that share that edge.
+            TopExp.MapShapesAndAncestors_s(
+                # shape.wrapped, ta.TopAbs_EDGE, ta.TopAbs_FACE, shape_map
+                shape,
+                ta.TopAbs_EDGE,
+                ta.TopAbs_FACE,
+                shape_map,
+            )
+
+            # Iterate over the edges in the map and checks if each edge is non-degenerate and has
+            # exactly two faces associated with it.
+            for i in range(shape_map.Extent()):
+                # Access each edge in the map sequentially
+                edge = TopoDS.Edge_s(shape_map.FindKey(i + 1))
+
+                vertex0 = TopoDS_Vertex()
+                vertex1 = TopoDS_Vertex()
+
+                # Extract the two vertices of the current edge and stores them in vertex0/1.
+                TopExp.Vertices_s(edge, vertex0, vertex1)
+
+                # Check if both vertices are null and if they are the same vertex. If so, the
+                # edge is considered degenerate (i.e., has zero length), and it is skipped.
+                if vertex0.IsNull() and vertex1.IsNull() and vertex0.IsSame(vertex1):
+                    continue
+
+                # Check if the current edge has exactly two faces associated with it. If not,
+                # it means the edge is not shared by exactly two faces, indicating that the
+                # shape is not manifold.
+                if shape_map.FindFromIndex(i + 1).Extent() != 2:
+                    return False
+
+        return True
+
+    @property
+    def is_planar_face(self) -> bool:
+        """Is the shape a planar face even though its geom_type may not be PLANE"""
+        if self.wrapped is None or not isinstance(self.wrapped, TopoDS_Face):
+            return False
+        surface = BRep_Tool.Surface_s(self.wrapped)
+        is_face_planar = GeomLib_IsPlanarSurface(surface, TOLERANCE)
+        return is_face_planar.IsPlanar()
+
+    @property
+    def location(self) -> Location | None:
+        """Get this Shape's Location"""
+        if self.wrapped is None:
+            return None
+        return Location(self.wrapped.Location())
+
+    @location.setter
+    def location(self, value: Location):
+        """Set Shape's Location to value"""
+        if self.wrapped is not None:
+            self.wrapped.Location(value.wrapped)
+
+    @property
+    def orientation(self) -> Vector | None:
+        """Get the orientation component of this Shape's Location"""
+        if self.location is None:
+            return None
+        return self.location.orientation
+
+    @orientation.setter
+    def orientation(self, rotations: VectorLike):
+        """Set the orientation component of this Shape's Location to rotations"""
+        loc = self.location
+        if loc is not None:
+            loc.orientation = Vector(rotations)
+            self.location = loc
+
+    @property
+    def position(self) -> Vector | None:
+        """Get the position component of this Shape's Location"""
+        if self.wrapped is None or self.location is None:
+            return None
+        return self.location.position
+
+    @position.setter
+    def position(self, value: VectorLike):
+        """Set the position component of this Shape's Location to value"""
+        loc = self.location
+        if loc is not None:
+            loc.position = Vector(value)
+            self.location = loc
+
+    # ---- Class Methods ----
+
+    @classmethod
+    @abstractmethod
+    def cast(cls: Type[Self], obj: TopoDS_Shape) -> Self:
+        """Returns the right type of wrapper, given a OCCT object"""
+
+    @classmethod
+    @abstractmethod
+    def extrude(
+        cls, obj: Shape, direction: VectorLike
+    ) -> Edge | Face | Shell | Solid | Compound:
+        """extrude
+
+        Extrude a Shape in the provided direction.
+        * Vertices generate Edges
+        * Edges generate Faces
+        * Wires generate Shells
+        * Faces generate Solids
+        * Shells generate Compounds
+
+        Args:
+            direction (VectorLike): direction and magnitude of extrusion
+
+        Raises:
+            ValueError: Unsupported class
+            RuntimeError: Generated invalid result
+
+        Returns:
+            Edge | Face | Shell | Solid | Compound: extruded shape
+        """
+
+    # ---- Static Methods ----
+
+    @staticmethod
+    def _build_tree(
+        shape: TopoDS_Shape,
+        tree: list[_DisplayNode],
+        parent: _DisplayNode | None = None,
+        limit: TopAbs_ShapeEnum = TopAbs_ShapeEnum.TopAbs_VERTEX,
+        show_center: bool = True,
+    ) -> list[_DisplayNode]:
+        """Create an anytree copy of the TopoDS_Shape structure"""
+
+        obj_type = Shape.shape_LUT[shape.ShapeType()]
+        loc: Vector | Location
+        if show_center:
+            loc = Shape(shape).bounding_box().center()
+        else:
+            loc = Location(shape.Location())
+        tree.append(Shape._DisplayNode(obj_type, id(shape), loc, parent))
+        iterator = TopoDS_Iterator()
+        iterator.Initialize(shape)
+        parent_node = tree[-1]
+        while iterator.More():
+            child = iterator.Value()
+            if Shape._ordered_shapes.index(
+                child.ShapeType()
+            ) <= Shape._ordered_shapes.index(limit):
+                Shape._build_tree(child, tree, parent_node, limit)
+            iterator.Next()
+        return tree
+
+    @staticmethod
+    def _show_tree(root_node, show_center: bool) -> str:
+        """Display an assembly or TopoDS_Shape anytree structure"""
+
+        # Calculate the size of the tree labels
+        size_tuples = [(node.height, len(node.label)) for node in root_node.descendants]
+        size_tuples.append((root_node.height, len(root_node.label)))
+        # pylint: disable=cell-var-from-loop
+        size_tuples_per_level = [
+            list(filter(lambda ll: ll[0] == l, size_tuples))
+            for l in range(root_node.height + 1)
+        ]
+        max_sizes_per_level = [
+            max(4, max(l[1] for l in level)) for level in size_tuples_per_level
+        ]
+        level_sizes_per_level = [
+            l + i * 4 for i, l in enumerate(reversed(max_sizes_per_level))
+        ]
+        tree_label_width = max(level_sizes_per_level) + 1
+
+        # Build the tree line by line
+        result = ""
+        for pre, _fill, node in RenderTree(root_node):
+            treestr = f"{pre}{node.label}".ljust(tree_label_width)
+            if hasattr(root_node, "address"):
+                address = node.address
+                name = ""
+                loc = (
+                    "Center" + str(node.position.to_tuple())
+                    if show_center
+                    else "Position" + str(node.position.to_tuple())
+                )
+            else:
+                address = id(node)
+                name = node.__class__.__name__.ljust(9)
+                loc = (
+                    "Center" + str(node.center().to_tuple())
+                    if show_center
+                    else "Location" + repr(node.location)
+                )
+            result += f"{treestr}{name}at {address:#x}, {loc}\n"
+        return result
+
+    @staticmethod
+    def combined_center(
+        objects: Iterable[Shape], center_of: CenterOf = CenterOf.MASS
+    ) -> Vector:
+        """combined center
+
+        Calculates the center of a multiple objects.
+
+        Args:
+            objects (Iterable[Shape]): list of objects
+            center_of (CenterOf, optional): centering option. Defaults to CenterOf.MASS.
+
+        Raises:
+            ValueError: CenterOf.GEOMETRY not implemented
+
+        Returns:
+            Vector: center of multiple objects
+        """
+        objects = list(objects)
+        if center_of == CenterOf.MASS:
+            total_mass = sum(Shape.compute_mass(o) for o in objects)
+            weighted_centers = [
+                o.center(CenterOf.MASS).multiply(Shape.compute_mass(o)) for o in objects
+            ]
+
+            sum_wc = weighted_centers[0]
+            for weighted_center in weighted_centers[1:]:
+                sum_wc = sum_wc.add(weighted_center)
+            middle = Vector(sum_wc.multiply(1.0 / total_mass))
+        elif center_of == CenterOf.BOUNDING_BOX:
+            total_mass = len(list(objects))
+
+            weighted_centers = []
+            for obj in objects:
+                weighted_centers.append(obj.bounding_box().center())
+
+            sum_wc = weighted_centers[0]
+            for weighted_center in weighted_centers[1:]:
+                sum_wc = sum_wc.add(weighted_center)
+
+            middle = Vector(sum_wc.multiply(1.0 / total_mass))
+        else:
+            raise ValueError("CenterOf.GEOMETRY not implemented")
+
+        return middle
+
+    @staticmethod
+    def compute_mass(obj: Shape) -> float:
+        """Calculates the 'mass' of an object.
+
+        Args:
+          obj: Compute the mass of this object
+          obj: Shape:
+
+        Returns:
+
+        """
+        if obj.wrapped is None:
+            return 0.0
+
+        properties = GProp_GProps()
+        calc_function = Shape.shape_properties_LUT[shapetype(obj.wrapped)]
+
+        if not calc_function:
+            raise NotImplementedError
+
+        calc_function(obj.wrapped, properties)
+        return properties.Mass()
+
+    @staticmethod
+    def get_shape_list(
+        shape: Shape,
+        entity_type: Literal[
+            "Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"
+        ],
+    ) -> ShapeList:
+        """Helper to extract entities of a specific type from a shape."""
+        if shape.wrapped is None:
+            return ShapeList()
+        shape_list = ShapeList(
+            [shape.__class__.cast(i) for i in shape.entities(entity_type)]
+        )
+        for item in shape_list:
+            item.topo_parent = shape
+        return shape_list
+
+    @staticmethod
+    def get_single_shape(
+        shape: Shape,
+        entity_type: Literal[
+            "Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"
+        ],
+    ) -> Shape:
+        """Helper to extract a single entity of a specific type from a shape,
+        with a warning if count != 1."""
+        shape_list = Shape.get_shape_list(shape, entity_type)
+        entity_count = len(shape_list)
+        if entity_count != 1:
+            warnings.warn(
+                f"Found {entity_count} {entity_type.lower()}s, returning first",
+                stacklevel=3,
+            )
+        return shape_list[0] if shape_list else None
+
+    # ---- Instance Methods ----
+
+    def __add__(self, other: None | Shape | Iterable[Shape]) -> Self | ShapeList[Self]:
+        """fuse shape to self operator +"""
+        # Convert `other` to list of base objects and filter out None values
+        if other is None:
+            summands = []
+        else:
+            summands = [
+                shape
+                # for o in (other if isinstance(other, (list, tuple)) else [other])
+                for o in ([other] if isinstance(other, Shape) else other)
+                if o is not None
+                for shape in o.get_top_level_shapes()
+            ]
+        # If there is nothing to add return the original object
+        if not summands:
+            return self
+
+        # Check that all dimensions are the same
+        addend_dim = self._dim
+        if addend_dim is None:
+            raise ValueError("Dimensions of objects to add to are inconsistent")
+
+        if not all(summand._dim == addend_dim for summand in summands):
+            raise ValueError("Only shapes with the same dimension can be added")
+
+        if self.wrapped is None:  # an empty object
+            if len(summands) == 1:
+                sum_shape = summands[0]
+            else:
+                sum_shape = summands[0].fuse(*summands[1:])
+        else:
+            sum_shape = self.fuse(*summands)
+
+        if SkipClean.clean and not isinstance(sum_shape, list):
+            sum_shape = sum_shape.clean()
+
+        return sum_shape
+
+    def __and__(self, other: Shape | Iterable[Shape]) -> None | Self | ShapeList[Self]:
+        """intersect shape with self operator &"""
+        others = other if isinstance(other, (list, tuple)) else [other]
+
+        if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
+            raise ValueError("Cannot intersect shape with empty compound")
+        new_shape = self.intersect(*others)
+
+        if (
+            not isinstance(new_shape, list)
+            and new_shape is not None
+            and new_shape.wrapped is not None
+            and SkipClean.clean
+        ):
+            new_shape = new_shape.clean()
+
+        return new_shape
+
+    def __copy__(self) -> Self:
+        """Return shallow copy or reference of self
+
+        Create an copy of this Shape that shares the underlying TopoDS_TShape.
+
+        Used when there is a need for many objects with the same CAD structure but at
+        different Locations, etc. - for examples fasteners in a larger assembly. By
+        sharing the TopoDS_TShape, the memory size of such assemblies can be greatly reduced.
+
+        Changes to the CAD structure of the base object will be reflected in all instances.
+        """
+        reference = copy.deepcopy(self)
+        if self.wrapped is not None:
+            assert (
+                reference.wrapped is not None
+            )  # Ensure mypy knows reference.wrapped is not None
+            reference.wrapped.TShape(self.wrapped.TShape())
+        return reference
+
+    def __deepcopy__(self, memo) -> Self:
+        """Return deepcopy of self"""
+        # The wrapped object is a OCCT TopoDS_Shape which can't be pickled or copied
+        # with the standard python copy/deepcopy, so create a deepcopy 'memo' with this
+        # value already copied which causes deepcopy to skip it.
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        if self.wrapped is not None:
+            memo[id(self.wrapped)] = downcast(BRepBuilderAPI_Copy(self.wrapped).Shape())
+        for key, value in self.__dict__.items():
+            setattr(result, key, copy.deepcopy(value, memo))
+            if key == "joints":
+                for joint in result.joints.values():
+                    joint.parent = result
+        return result
+
+    def __eq__(self, other) -> bool:
+        """Check if two shapes are the same.
+
+        This method checks if the current shape is the same as the other shape.
+        Two shapes are considered the same if they share the same TShape with
+        the same Locations. Orientations may differ.
+
+        Args:
+            other (Shape): The shape to compare with.
+
+        Returns:
+            bool: True if the shapes are the same, False otherwise.
+        """
+        if isinstance(other, Shape):
+            return self.is_same(other)
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        """Return has code"""
+        return self.hash_code()
+
+    def __rmul__(self, other):
+        """right multiply for positioning operator *"""
+        if not (
+            isinstance(other, (list, tuple))
+            and all(isinstance(o, (Location, Plane)) for o in other)
+        ):
+            raise ValueError(
+                "shapes can only be multiplied list of locations or planes"
+            )
+        return [loc * self for loc in other]
+
+    def __sub__(self, other: None | Shape | Iterable[Shape]) -> Self | ShapeList[Self]:
+        """cut shape from self operator -"""
+
+        if self.wrapped is None:
+            raise ValueError("Cannot subtract shape from empty compound")
+
+        # Convert `other` to list of base objects and filter out None values
+        if other is None:
+            subtrahends = []
+        else:
+            subtrahends = [
+                shape
+                # for o in (other if isinstance(other, (list, tuple)) else [other])
+                for o in ([other] if isinstance(other, Shape) else other)
+                if o is not None
+                for shape in o.get_top_level_shapes()
+            ]
+        # If there is nothing to subtract return the original object
+        if not subtrahends:
+            return self
+
+        # Check that all dimensions are the same
+        minuend_dim = self._dim
+        if minuend_dim is None or any(s._dim is None for s in subtrahends):
+            raise ValueError("Dimensions of objects to subtract from are inconsistent")
+
+        # Check that the operation is valid
+        subtrahend_dims = [s._dim for s in subtrahends if s._dim is not None]
+        if any(d < minuend_dim for d in subtrahend_dims):
+            raise ValueError(
+                f"Only shapes with equal or greater dimension can be subtracted: "
+                f"not {type(self).__name__} ({minuend_dim}D) and "
+                f"{type(other).__name__} ({min(subtrahend_dims)}D)"
+            )
+
+        # Do the actual cut operation
+        difference = self.cut(*subtrahends)
+
+        return difference
+
+    def bounding_box(
+        self, tolerance: float | None = None, optimal: bool = True
+    ) -> BoundBox:
+        """Create a bounding box for this Shape.
+
+        Args:
+            tolerance (float, optional): Defaults to None.
+
+        Returns:
+            BoundBox: A box sized to contain this Shape
+        """
+        if self.wrapped is None:
+            return BoundBox(Bnd_Box())
+        tolerance = TOLERANCE if tolerance is None else tolerance
+        return BoundBox.from_topo_ds(self.wrapped, tolerance=tolerance, optimal=optimal)
+
+    # Actually creating the abstract method causes the subclass to pass center_of
+    # even when not required - possibly this could be improved.
+    # @abstractmethod
+    # def center(self, center_of: CenterOf) -> Vector:
+    #     """Compute the center with a specific type of calculation."""
+
+    def clean(self) -> Self:
+        """clean
+
+        Remove internal edges
+
+        Returns:
+            Shape: Original object with extraneous internal edges removed
+        """
+        if self.wrapped is None:
+            return self
+        upgrader = ShapeUpgrade_UnifySameDomain(self.wrapped, True, True, True)
+        upgrader.AllowInternalEdges(False)
+        # upgrader.SetAngularTolerance(1e-5)
+        try:
+            upgrader.Build()
+            self.wrapped = tcast(TOPODS, downcast(upgrader.Shape()))
+        except Exception:
+            warnings.warn(f"Unable to clean {self}", stacklevel=2)
+        return self
+
+    def closest_points(self, other: Shape | VectorLike) -> tuple[Vector, Vector]:
+        """Points on two shapes where the distance between them is minimal"""
+        return self.distance_to_with_closest_points(other)[1:3]
+
+    def compound(self) -> Compound | None:
+        """Return the Compound"""
+        return None
+
+    def compounds(self) -> ShapeList[Compound]:
+        """compounds - all the compounds in this Shape"""
+        return ShapeList()
+
+    def copy_attributes_to(
+        self, target: Shape, exceptions: Iterable[str] | None = None
+    ):
+        """Copy common object attributes to target
+
+        Note that preset attributes of target will not be overridden.
+
+        Args:
+            target (Shape): object to gain attributes
+            exceptions (Iterable[str], optional): attributes not to copy
+
+        Raises:
+            ValueError: invalid attribute
+        """
+        # Find common attributes and eliminate exceptions
+        attrs1 = set(self.__dict__.keys())
+        attrs2 = set(target.__dict__.keys())
+        common_attrs = attrs1 & attrs2
+        if exceptions is not None:
+            common_attrs -= set(exceptions)
+
+        for attr in common_attrs:
+            # Copy the attribute only if the target's attribute not set
+            if not getattr(target, attr):
+                setattr(target, attr, getattr(self, attr))
+            # Attach joints to the new part
+            if attr == "joints":
+                joint: Joint
+                for joint in target.joints.values():
+                    joint.parent = target
+
+    def cut(self, *to_cut: Shape) -> Self | ShapeList[Self]:
+        """Remove the positional arguments from this Shape.
+
+        Args:
+          *to_cut: Shape:
+
+        Returns:
+            Self | ShapeList[Self]: Resulting object may be of a different class than self
+                or a ShapeList if multiple non-Compound object created
+        """
+
+        cut_op = BRepAlgoAPI_Cut()
+
+        return self._bool_op((self,), to_cut, cut_op)
+
+    def distance(self, other: Shape) -> float:
+        """Minimal distance between two shapes
+
+        Args:
+          other: Shape:
+
+        Returns:
+
+        """
+        if self.wrapped is None or other.wrapped is None:
+            raise ValueError("Cannot calculate distance to or from an empty shape")
+
+        return BRepExtrema_DistShapeShape(self.wrapped, other.wrapped).Value()
+
+    def distance_to(self, other: Shape | VectorLike) -> float:
+        """Minimal distance between two shapes"""
+        return self.distance_to_with_closest_points(other)[0]
+
+    def distance_to_with_closest_points(
+        self, other: Shape | VectorLike
+    ) -> tuple[float, Vector, Vector]:
+        """Minimal distance between two shapes and the points on each shape"""
+        if self.wrapped is None or (isinstance(other, Shape) and other.wrapped is None):
+            raise ValueError("Cannot calculate distance to or from an empty shape")
+
+        if isinstance(other, Shape):
+            topods_shape = tcast(TopoDS_Shape, other.wrapped)
+        else:
+            vec = Vector(other)
+            topods_shape = BRepBuilderAPI_MakeVertex(
+                gp_Pnt(vec.X, vec.Y, vec.Z)
+            ).Vertex()
+
+        dist_calc = BRepExtrema_DistShapeShape()
+        dist_calc.LoadS1(self.wrapped)
+        dist_calc.LoadS2(topods_shape)
+        dist_calc.Perform()
+        return (
+            dist_calc.Value(),
+            Vector(dist_calc.PointOnShape1(1)),
+            Vector(dist_calc.PointOnShape2(1)),
+        )
+
+    def distances(self, *others: Shape) -> Iterator[float]:
+        """Minimal distances to between self and other shapes
+
+        Args:
+          *others: Shape:
+
+        Returns:
+
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot calculate distance to or from an empty shape")
+
+        dist_calc = BRepExtrema_DistShapeShape()
+        dist_calc.LoadS1(self.wrapped)
+
+        for other_shape in others:
+            if other_shape.wrapped is None:
+                raise ValueError("Cannot calculate distance to or from an empty shape")
+            dist_calc.LoadS2(other_shape.wrapped)
+            dist_calc.Perform()
+
+            yield dist_calc.Value()
+
+    def edge(self) -> Edge | None:
+        """Return the Edge"""
+        return None
+
+    # Note all sub-classes have vertices and vertex methods
+
+    def edges(self) -> ShapeList[Edge]:
+        """edges - all the edges in this Shape - subclasses may override"""
+        return ShapeList()
+
+    def entities(self, topo_type: Shapes) -> list[TopoDS_Shape]:
+        """Return all of the TopoDS sub entities of the given type"""
+        if self.wrapped is None:
+            return []
+        return _topods_entities(self.wrapped, topo_type)
+
+    def face(self) -> Face | None:
+        """Return the Face"""
+        return None
+
+    def faces(self) -> ShapeList[Face]:
+        """faces - all the faces in this Shape"""
+        return ShapeList()
+
+    def faces_intersected_by_axis(
+        self,
+        axis: Axis,
+        tol: float = 1e-4,
+    ) -> ShapeList[Face]:
+        """Line Intersection
+
+        Computes the intersections between the provided axis and the faces of this Shape
+
+        Args:
+            axis (Axis): Axis on which the intersection line rests
+            tol (float, optional): Intersection tolerance. Defaults to 1e-4.
+
+        Returns:
+            list[Face]: A list of intersected faces sorted by distance from axis.position
+        """
+        if self.wrapped is None:
+            return ShapeList()
+
+        line = gce_MakeLin(axis.wrapped).Value()
+
+        intersect_maker = BRepIntCurveSurface_Inter()
+        intersect_maker.Init(self.wrapped, line, tol)
+
+        faces_dist = []  # using a list instead of a dictionary to be able to sort it
+        while intersect_maker.More():
+            inter_pt = intersect_maker.Pnt()
+
+            distance = axis.position.to_pnt().SquareDistance(inter_pt)
+
+            faces_dist.append(
+                (
+                    intersect_maker.Face(),
+                    abs(distance),
+                )
+            )  # will sort all intersected faces by distance whatever the direction is
+
+            intersect_maker.Next()
+
+        faces_dist.sort(key=lambda x: x[1])
+        faces = [face[0] for face in faces_dist]
+
+        return ShapeList([self.__class__.cast(face) for face in faces])
+
+    def fix(self) -> Self:
+        """fix - try to fix shape if not valid"""
+        if self.wrapped is None:
+            return self
+        if not self.is_valid():
+            shape_copy: Shape = copy.deepcopy(self, None)
+            shape_copy.wrapped = tcast(TOPODS, fix(self.wrapped))
+
+            return shape_copy
+
+        return self
+
+    def fuse(
+        self, *to_fuse: Shape, glue: bool = False, tol: float | None = None
+    ) -> Self | ShapeList[Self]:
+        """fuse
+
+        Fuse a sequence of shapes into a single shape.
+
+        Args:
+            to_fuse (sequence Shape): shapes to fuse
+            glue (bool, optional): performance improvement for some shapes. Defaults to False.
+            tol (float, optional): tolerance. Defaults to None.
+
+        Returns:
+            Self | ShapeList[Self]: Resulting object may be of a different class than self
+                or a ShapeList if multiple non-Compound object created
+
+        """
+
+        fuse_op = BRepAlgoAPI_Fuse()
+        if glue:
+            fuse_op.SetGlue(BOPAlgo_GlueEnum.BOPAlgo_GlueShift)
+        if tol:
+            fuse_op.SetFuzzyValue(tol)
+
+        return_value = self._bool_op((self,), to_fuse, fuse_op)
+
+        return return_value
+
+    # def _entities_from(
+    #     self, child_type: Shapes, parent_type: Shapes
+    # ) -> Dict[Shape, list[Shape]]:
+    #     """This function is very slow on M1 macs and is currently unused"""
+    #     if self.wrapped is None:
+    #         return {}
+
+    #     res = TopTools_IndexedDataMapOfShapeListOfShape()
+
+    #     TopExp.MapShapesAndAncestors_s(
+    #         self.wrapped,
+    #         Shape.inverse_shape_LUT[child_type],
+    #         Shape.inverse_shape_LUT[parent_type],
+    #         res,
+    #     )
+
+    #     out: Dict[Shape, list[Shape]] = {}
+    #     for i in range(1, res.Extent() + 1):
+    #         out[self.__class__.cast(res.FindKey(i))] = [
+    #             self.__class__.cast(el) for el in res.FindFromIndex(i)
+    #         ]
+
+    #     return out
+
+    def get_top_level_shapes(self) -> ShapeList[Shape]:
+        """
+        Retrieve the first level of child shapes from the shape.
+
+        This method collects all the non-compound shapes directly contained in the
+        current shape. If the wrapped shape is a `TopoDS_Compound`, it traverses
+        its immediate children and collects all shapes that are not further nested
+        compounds. Nested compounds are traversed to gather their non-compound elements
+        without returning the nested compound itself.
+
+        Returns:
+            ShapeList[Shape]: A list of all first-level non-compound child shapes.
+
+        Example:
+            If the current shape is a compound containing both simple shapes
+            (e.g., edges, vertices) and other compounds, the method returns a list
+            of only the simple shapes directly contained at the top level.
+        """
+        if self.wrapped is None:
+            return ShapeList()
+        return ShapeList(
+            self.__class__.cast(s) for s in get_top_level_topods_shapes(self.wrapped)
+        )
+
+    def hash_code(self) -> int:
+        """Returns a hashed value denoting this shape. It is computed from the
+        TShape and the Location. The Orientation is not used.
+
+        Args:
+
+        Returns:
+
+        """
+        if self.wrapped is None:
+            return 0
+        return self.wrapped.HashCode(HASH_CODE_MAX)
+
+    def intersect(
+        self, *to_intersect: Shape | Axis | Plane
+    ) -> None | Self | ShapeList[Self]:
+        """Intersection of the arguments and this shape
+
+        Args:
+            to_intersect (sequence of Union[Shape, Axis, Plane]): Shape(s) to
+                intersect with
+
+        Returns:
+            Self | ShapeList[Self]: Resulting object may be of a different class than self
+                or a ShapeList if multiple non-Compound object created
+        """
+
+        def _to_vertex(vec: Vector) -> Vertex:
+            """Helper method to convert vector to shape"""
+            return self.__class__.cast(
+                downcast(
+                    BRepBuilderAPI_MakeVertex(gp_Pnt(vec.X, vec.Y, vec.Z)).Vertex()
+                )
+            )
+
+        def _to_edge(axis: Axis) -> Edge:
+            """Helper method to convert axis to shape"""
+            return self.__class__.cast(
+                BRepBuilderAPI_MakeEdge(
+                    Geom_Line(
+                        axis.position.to_pnt(),
+                        axis.direction.to_dir(),
+                    )
+                ).Edge()
+            )
+
+        def _to_face(plane: Plane) -> Face:
+            """Helper method to convert plane to shape"""
+            return self.__class__.cast(BRepBuilderAPI_MakeFace(plane.wrapped).Face())
+
+        # Convert any geometry objects into their respective topology objects
+        objs = []
+        for obj in to_intersect:
+            if isinstance(obj, Vector):
+                objs.append(_to_vertex(obj))
+            elif isinstance(obj, Axis):
+                objs.append(_to_edge(obj))
+            elif isinstance(obj, Plane):
+                objs.append(_to_face(obj))
+            elif isinstance(obj, Location):
+                if obj.wrapped is None:
+                    raise ValueError("Cannot intersect with an empty location")
+                objs.append(_to_vertex(tcast(Vector, obj.position)))
+            else:
+                objs.append(obj)
+
+        # Find the shape intersections
+        intersect_op = BRepAlgoAPI_Common()
+        shape_intersections = self._bool_op((self,), objs, intersect_op)
+        if isinstance(shape_intersections, ShapeList) and not shape_intersections:
+            return None
+        if (
+            not isinstance(shape_intersections, ShapeList)
+            and shape_intersections.is_null()
+        ):
+            return None
+        return shape_intersections
+
+    def is_equal(self, other: Shape) -> bool:
+        """Returns True if two shapes are equal, i.e. if they share the same
+        TShape with the same Locations and Orientations. Also see
+        :py:meth:`is_same`.
+
+        Args:
+          other: Shape:
+
+        Returns:
+
+        """
+        if self.wrapped is None or other.wrapped is None:
+            return False
+        return self.wrapped.IsEqual(other.wrapped)
+
+    def is_null(self) -> bool:
+        """Returns true if this shape is null. In other words, it references no
+        underlying shape with the potential to be given a location and an
+        orientation.
+
+        Args:
+
+        Returns:
+
+        """
+        return self.wrapped is None or self.wrapped.IsNull()
+
+    def is_same(self, other: Shape) -> bool:
+        """Returns True if other and this shape are same, i.e. if they share the
+        same TShape with the same Locations. Orientations may differ. Also see
+        :py:meth:`is_equal`
+
+        Args:
+          other: Shape:
+
+        Returns:
+
+        """
+        if self.wrapped is None or other.wrapped is None:
+            return False
+        return self.wrapped.IsSame(other.wrapped)
+
+    def is_valid(self) -> bool:
+        """Returns True if no defect is detected on the shape S or any of its
+        subshapes. See the OCCT docs on BRepCheck_Analyzer::IsValid for a full
+        description of what is checked.
+
+        Args:
+
+        Returns:
+
+        """
+        if self.wrapped is None:
+            return True
+        chk = BRepCheck_Analyzer(self.wrapped)
+        chk.SetParallel(True)
+        return chk.IsValid()
+
+    def locate(self, loc: Location) -> Self:
+        """Apply a location in absolute sense to self
+
+        Args:
+          loc: Location:
+
+        Returns:
+
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot locate an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot locate a shape at an empty location")
+        self.wrapped.Location(loc.wrapped)
+
+        return self
+
+    def located(self, loc: Location) -> Self:
+        """located
+
+        Apply a location in absolute sense to a copy of self
+
+        Args:
+            loc (Location): new absolute location
+
+        Returns:
+            Shape: copy of Shape at location
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot locate an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot locate a shape at an empty location")
+        shape_copy: Shape = copy.deepcopy(self, None)
+        shape_copy.wrapped.Location(loc.wrapped)  # type: ignore
+        return shape_copy
+
+    def mesh(self, tolerance: float, angular_tolerance: float = 0.1):
+        """Generate triangulation if none exists.
+
+        Args:
+          tolerance: float:
+          angular_tolerance: float:  (Default value = 0.1)
+
+        Returns:
+
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot mesh an empty shape")
+
+        if not BRepTools.Triangulation_s(self.wrapped, tolerance):
+            BRepMesh_IncrementalMesh(
+                self.wrapped, tolerance, True, angular_tolerance, True
+            )
+
+    def mirror(self, mirror_plane: Plane | None = None) -> Self:
+        """
+        Applies a mirror transform to this Shape. Does not duplicate objects
+        about the plane.
+
+        Args:
+          mirror_plane (Plane): The plane to mirror about. Defaults to Plane.XY
+        Returns:
+          The mirrored shape
+        """
+        if not mirror_plane:
+            mirror_plane = Plane.XY
+
+        if self.wrapped is None:
+            return self
+        transformation = gp_Trsf()
+        transformation.SetMirror(
+            gp_Ax2(mirror_plane.origin.to_pnt(), mirror_plane.z_dir.to_dir())
+        )
+
+        return self._apply_transform(transformation)
+
+    def move(self, loc: Location) -> Self:
+        """Apply a location in relative sense (i.e. update current location) to self
+
+        Args:
+          loc: Location:
+
+        Returns:
+
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot move an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot move a shape at an empty location")
+
+        self.wrapped.Move(loc.wrapped)
+
+        return self
+
+    def moved(self, loc: Location) -> Self:
+        """moved
+
+        Apply a location in relative sense (i.e. update current location) to a copy of self
+
+        Args:
+            loc (Location): new location relative to current location
+
+        Returns:
+            Shape: copy of Shape moved to relative location
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot move an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot move a shape at an empty location")
+        shape_copy: Shape = copy.deepcopy(self, None)
+        shape_copy.wrapped = tcast(TOPODS, downcast(self.wrapped.Moved(loc.wrapped)))
+        return shape_copy
+
+    def project_faces(
+        self,
+        faces: list[Face] | Compound,
+        path: Wire | Edge,
+        start: float = 0,
+    ) -> ShapeList[Face]:
+        """Projected Faces following the given path on Shape
+
+        Project by positioning each face of to the shape along the path and
+        projecting onto the surface.
+
+        Note that projection may result in distortion depending on
+        the shape at a position along the path.
+
+        .. image:: projectText.png
+
+        Args:
+            faces (Union[list[Face], Compound]): faces to project
+            path: Path on the Shape to follow
+            start: Relative location on path to start the faces. Defaults to 0.
+
+        Returns:
+            The projected faces
+
+        """
+        # pylint: disable=too-many-locals
+        path_length = path.length
+        # The derived classes of Shape implement center
+        shape_center = self.center()  # pylint: disable=no-member
+
+        if (
+            not isinstance(faces, (list, tuple))
+            and faces.wrapped is not None
+            and isinstance(faces.wrapped, TopoDS_Compound)
+        ):
+            faces = faces.faces()
+
+        first_face_min_x = faces[0].bounding_box().min.X
+
+        logger.debug("projecting %d face(s)", len(faces))
+
+        # Position each face normal to the surface along the path and project to the surface
+        projected_faces = []
+        for face in faces:
+            bbox = face.bounding_box()
+            face_center_x = (bbox.min.X + bbox.max.X) / 2
+            relative_position_on_wire = (
+                start + (face_center_x - first_face_min_x) / path_length
+            )
+            path_position = path.position_at(relative_position_on_wire)
+            path_tangent = path.tangent_at(relative_position_on_wire)
+            projection_axis = Axis(path_position, shape_center - path_position)
+            (surface_point, surface_normal) = self.find_intersection_points(
+                projection_axis
+            )[0]
+            surface_normal_plane = Plane(
+                origin=surface_point, x_dir=path_tangent, z_dir=surface_normal
+            )
+            projection_face: Face = surface_normal_plane.from_local_coords(
+                face.moved(Location((-face_center_x, 0, 0)))
+            )
+
+            logger.debug("projecting face at %0.2f", relative_position_on_wire)
+            projected_faces.append(
+                projection_face.project_to_shape(self, surface_normal * -1)[0]
+            )
+
+        logger.debug("finished projecting '%d' faces", len(faces))
+
+        return ShapeList(projected_faces)
+
+    def relocate(self, loc: Location):
+        """Change the location of self while keeping it geometrically similar
+
+        Args:
+            loc (Location): new location to set for self
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot relocate an empty shape")
+        if loc.wrapped is None:
+            raise ValueError("Cannot relocate a shape at an empty location")
+
+        if self.location != loc:
+            old_ax = gp_Ax3()
+            old_ax.Transform(self.location.wrapped.Transformation())  # type: ignore
+
+            new_ax = gp_Ax3()
+            new_ax.Transform(loc.wrapped.Transformation())
+
+            trsf = gp_Trsf()
+            trsf.SetDisplacement(new_ax, old_ax)
+            builder = BRepBuilderAPI_Transform(self.wrapped, trsf, True, True)
+
+            self.wrapped = tcast(TOPODS, downcast(builder.Shape()))
+            self.wrapped.Location(loc.wrapped)
+
+    def rotate(self, axis: Axis, angle: float) -> Self:
+        """rotate a copy
+
+        Rotates a shape around an axis.
+
+        Args:
+            axis (Axis): rotation Axis
+            angle (float): angle to rotate, in degrees
+
+        Returns:
+            a copy of the shape, rotated
+        """
+        transformation = gp_Trsf()
+        transformation.SetRotation(axis.wrapped, angle * DEG2RAD)
+
+        return self._apply_transform(transformation)
+
+    def scale(self, factor: float) -> Self:
+        """Scales this shape through a transformation.
+
+        Args:
+          factor: float:
+
+        Returns:
+
+        """
+
+        transformation = gp_Trsf()
+        transformation.SetScale(gp_Pnt(), factor)
+
+        return self._apply_transform(transformation)
+
+    def shape_type(self) -> Shapes:
+        """Return the shape type string for this class"""
+        return tcast(Shapes, Shape.shape_LUT[shapetype(self.wrapped)])
+
+    def shell(self) -> Shell | None:
+        """Return the Shell"""
+        return None
+
+    def shells(self) -> ShapeList[Shell]:
+        """shells - all the shells in this Shape"""
+        return ShapeList()
+
+    def show_topology(
+        self,
+        limit_class: Literal[
+            "Compound", "Edge", "Face", "Shell", "Solid", "Vertex", "Wire"
+        ] = "Vertex",
+        show_center: bool | None = None,
+    ) -> str:
+        """Display internal topology
+
+        Display the internal structure of a Compound 'assembly' or Shape. Example:
+
+        .. code::
+
+            >>> c1.show_topology()
+
+            c1 is the root         Compound at 0x7f4a4cafafa0, Location(...))
+            ├──                    Solid    at 0x7f4a4cafafd0, Location(...))
+            ├── c2 is 1st compound Compound at 0x7f4a4cafaee0, Location(...))
+            │   ├──                Solid    at 0x7f4a4cafad00, Location(...))
+            │   └──                Solid    at 0x7f4a11a52790, Location(...))
+            └── c3 is 2nd          Compound at 0x7f4a4cafad60, Location(...))
+                ├──                Solid    at 0x7f4a11a52700, Location(...))
+                └──                Solid    at 0x7f4a11a58550, Location(...))
+
+        Args:
+            limit_class: type of displayed leaf node. Defaults to 'Vertex'.
+            show_center (bool, optional): If None, shows the Location of Compound 'assemblies'
+                and the bounding box center of Shapes. True or False forces the display.
+                Defaults to None.
+
+        Returns:
+            str: tree representation of internal structure
+        """
+        if (
+            self.wrapped is not None
+            and isinstance(self.wrapped, TopoDS_Compound)
+            and self.children
+        ):
+            show_center = False if show_center is None else show_center
+            result = Shape._show_tree(self, show_center)
+        else:
+            tree = Shape._build_tree(
+                tcast(TopoDS_Shape, self.wrapped),
+                tree=[],
+                limit=Shape.inverse_shape_LUT[limit_class],
+            )
+            show_center = True if show_center is None else show_center
+            result = Shape._show_tree(tree[0], show_center)
+        return result
+
+    def solid(self) -> Solid | None:
+        """Return the Solid"""
+        return None
+
+    def solids(self) -> ShapeList[Solid]:
+        """solids - all the solids in this Shape"""
+        return ShapeList()
+
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Edge | Wire, keep: Literal[Keep.INSIDE, Keep.OUTSIDE]
+    ) -> Face | Shell | ShapeList[Face] | None:
+        """split_by_perimeter and keep inside or outside"""
+
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Edge | Wire, keep: Literal[Keep.BOTH]
+    ) -> tuple[
+        Face | Shell | ShapeList[Face] | None,
+        Face | Shell | ShapeList[Face] | None,
+    ]:
+        """split_by_perimeter and keep inside and outside"""
+
+    @overload
+    def split_by_perimeter(
+        self, perimeter: Edge | Wire
+    ) -> Face | Shell | ShapeList[Face] | None:
+        """split_by_perimeter and keep inside (default)"""
+
+    def split_by_perimeter(self, perimeter: Edge | Wire, keep: Keep = Keep.INSIDE):
+        """split_by_perimeter
+
+        Divide the faces of this object into those within the perimeter
+        and those outside the perimeter.
+
+        Note: this method may fail if the perimeter intersects shape edges.
+
+        Args:
+            perimeter (Union[Edge,Wire]): closed perimeter
+            keep (Keep, optional): which object(s) to return. Defaults to Keep.INSIDE.
+
+        Raises:
+            ValueError: perimeter must be closed
+            ValueError: keep must be one of Keep.INSIDE|OUTSIDE|BOTH
+
+        Returns:
+            Union[Face | Shell | ShapeList[Face] | None,
+            Tuple[Face | Shell | ShapeList[Face] | None]: The result of the split operation.
+
+            - **Keep.INSIDE**: Returns the inside part as a `Shell` or `Face`, or `None`
+              if no inside part is found.
+            - **Keep.OUTSIDE**: Returns the outside part as a `Shell` or `Face`, or `None`
+              if no outside part is found.
+            - **Keep.BOTH**: Returns a tuple `(inside, outside)` where each element is
+              either a `Shell`, `Face`, or `None` if no corresponding part is found.
+
+        """
+
+        def get(los: TopTools_ListOfShape) -> list:
+            """Return objects from TopTools_ListOfShape as list"""
+            shapes = []
+            for _ in range(los.Size()):
+                first = los.First()
+                if not first.IsNull():
+                    shapes.append(self.__class__.cast(first))
+                los.RemoveFirst()
+            return shapes
+
+        def process_sides(sides):
+            """Process sides to determine if it should be None, a single element,
+            a Shell, or a ShapeList."""
+            # if not sides:
+            #     return None
+            if len(sides) == 1:
+                return sides[0]
+            # Attempt to create a shell
+            potential_shell = _sew_topods_faces([s.wrapped for s in sides])
+            if isinstance(potential_shell, TopoDS_Shell):
+                return self.__class__.cast(potential_shell)
+            return ShapeList(sides)
+
+        if keep not in {Keep.INSIDE, Keep.OUTSIDE, Keep.BOTH}:
+            raise ValueError(
+                "keep must be one of Keep.INSIDE, Keep.OUTSIDE, or Keep.BOTH"
+            )
+
+        if self.wrapped is None:
+            raise ValueError("Cannot split an empty shape")
+
+        # Process the perimeter
+        if not perimeter.is_closed:
+            raise ValueError("perimeter must be a closed Wire or Edge")
+        perimeter_edges = TopTools_SequenceOfShape()
+        for perimeter_edge in perimeter.edges():
+            perimeter_edges.Append(perimeter_edge.wrapped)
+
+        # Split the shells by the perimeter edges
+        lefts: list[Shell] = []
+        rights: list[Shell] = []
+        for target_shell in self.shells():
+            constructor = BRepFeat_SplitShape(target_shell.wrapped)
+            constructor.Add(perimeter_edges)
+            constructor.Build()
+            lefts.extend(get(constructor.Left()))
+            rights.extend(get(constructor.Right()))
+
+        left = process_sides(lefts)
+        right = process_sides(rights)
+
+        # Is left or right the inside?
+        perimeter_length = perimeter.length
+        left_perimeter_length = sum(e.length for e in left.edges()) if left else 0
+        right_perimeter_length = sum(e.length for e in right.edges()) if right else 0
+        left_inside = abs(perimeter_length - left_perimeter_length) < abs(
+            perimeter_length - right_perimeter_length
+        )
+        if keep == Keep.BOTH:
+            return (left, right) if left_inside else (right, left)
+        if keep == Keep.INSIDE:
+            return left if left_inside else right
+        # keep == Keep.OUTSIDE:
+        return right if left_inside else left
+
+    def tessellate(
+        self, tolerance: float, angular_tolerance: float = 0.1
+    ) -> Tuple[list[Vector], list[Tuple[int, int, int]]]:
+        """General triangulated approximation"""
+        if self.wrapped is None:
+            raise ValueError("Cannot tessellate an empty shape")
+
+        self.mesh(tolerance, angular_tolerance)
+
+        vertices: list[Vector] = []
+        triangles: list[Tuple[int, int, int]] = []
+        offset = 0
+
+        for face in self.faces():
+            assert face.wrapped is not None
+            loc = TopLoc_Location()
+            poly = BRep_Tool.Triangulation_s(face.wrapped, loc)
+            trsf = loc.Transformation()
+            reverse = face.wrapped.Orientation() == TopAbs_Orientation.TopAbs_REVERSED
+
+            # add vertices
+            vertices += [
+                Vector(v.X(), v.Y(), v.Z())
+                for v in (
+                    poly.Node(i).Transformed(trsf) for i in range(1, poly.NbNodes() + 1)
+                )
+            ]
+            # add triangles
+            triangles += [
+                (
+                    (
+                        t.Value(1) + offset - 1,
+                        t.Value(3) + offset - 1,
+                        t.Value(2) + offset - 1,
+                    )
+                    if reverse
+                    else (
+                        t.Value(1) + offset - 1,
+                        t.Value(2) + offset - 1,
+                        t.Value(3) + offset - 1,
+                    )
+                )
+                for t in poly.Triangles()
+            ]
+
+            offset += poly.NbNodes()
+
+        return vertices, triangles
+
+    def to_splines(
+        self, degree: int = 3, tolerance: float = 1e-3, nurbs: bool = False
+    ) -> Self:
+        """to_splines
+
+        Approximate shape with b-splines of the specified degree.
+
+        Args:
+            degree (int, optional): Maximum degree. Defaults to 3.
+            tolerance (float, optional): Approximation tolerance. Defaults to 1e-3.
+            nurbs (bool, optional): Use rational splines. Defaults to False.
+
+        Returns:
+            Self: Approximated shape
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot approximate an empty shape")
+
+        params = ShapeCustom_RestrictionParameters()
+
+        result = ShapeCustom.BSplineRestriction_s(
+            self.wrapped,
+            tolerance,  # 3D tolerance
+            tolerance,  # 2D tolerance
+            degree,
+            1,  # dummy value, degree is leading
+            ga.GeomAbs_C0,
+            ga.GeomAbs_C0,
+            True,  # set degree to be leading
+            not nurbs,
+            params,
+        )
+
+        return self.__class__.cast(result)
+
+    def to_vtk_poly_data(
+        self,
+        tolerance: float | None = None,
+        angular_tolerance: float | None = None,
+        normals: bool = False,
+    ) -> vtkPolyData:
+        """Convert shape to vtkPolyData
+
+        Args:
+          tolerance: float:
+          angular_tolerance: float:  (Default value = 0.1)
+          normals: bool:  (Default value = True)
+
+        Returns: data object in VTK consisting of points, vertices, lines, and polygons
+        """
+        if self.wrapped is None:
+            raise ValueError("Cannot convert an empty shape")
+
+        vtk_shape = IVtkOCC_Shape(self.wrapped)
+        shape_data = IVtkVTK_ShapeData()
+        shape_mesher = IVtkOCC_ShapeMesher()
+
+        drawer = vtk_shape.Attributes()
+        drawer.SetUIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
+        drawer.SetVIsoAspect(Prs3d_IsoAspect(Quantity_Color(), Aspect_TOL_SOLID, 1, 0))
+
+        if tolerance:
+            drawer.SetDeviationCoefficient(tolerance)
+
+        if angular_tolerance:
+            drawer.SetDeviationAngle(angular_tolerance)
+
+        shape_mesher.Build(vtk_shape, shape_data)
+
+        vtk_poly_data = shape_data.getVtkPolyData()
+
+        # convert to triangles and split edges
+        t_filter = vtkTriangleFilter()
+        t_filter.SetInputData(vtk_poly_data)
+        t_filter.Update()
+
+        return_value = t_filter.GetOutput()
+
+        # compute normals
+        if normals:
+            n_filter = vtkPolyDataNormals()
+            n_filter.SetComputePointNormals(True)
+            n_filter.SetComputeCellNormals(True)
+            n_filter.SetFeatureAngle(360)
+            n_filter.SetInputData(return_value)
+            n_filter.Update()
+
+            return_value = n_filter.GetOutput()
+
+        return return_value
+
+    def transform_geometry(self, t_matrix: Matrix) -> Self:
+        """Apply affine transform
+
+        WARNING: transform_geometry will sometimes convert lines and circles to
+        splines, but it also has the ability to handle skew and stretching
+        transformations.
+
+        If your transformation is only translation and rotation, it is safer to
+        use :py:meth:`transform_shape`, which doesn't change the underlying type
+        of the geometry, but cannot handle skew transformations.
+
+        Args:
+            t_matrix (Matrix): affine transformation matrix
+
+        Returns:
+            Shape: a copy of the object, but with geometry transformed
+        """
+        if self.wrapped is None:
+            return self
+        new_shape = copy.deepcopy(self, None)
+        transformed = downcast(
+            BRepBuilderAPI_GTransform(self.wrapped, t_matrix.wrapped, True).Shape()
+        )
+        new_shape.wrapped = tcast(TOPODS, transformed)
+
+        return new_shape
+
+    def transform_shape(self, t_matrix: Matrix) -> Self:
+        """Apply affine transform without changing type
+
+        Transforms a copy of this Shape by the provided 3D affine transformation matrix.
+        Note that not all transformation are supported - primarily designed for translation
+        and rotation.  See :transform_geometry: for more comprehensive transformations.
+
+        Args:
+            t_matrix (Matrix): affine transformation matrix
+
+        Returns:
+            Shape: copy of transformed shape with all objects keeping their type
+        """
+        if self.wrapped is None:
+            return self
+        new_shape = copy.deepcopy(self, None)
+        transformed = downcast(
+            BRepBuilderAPI_Transform(self.wrapped, t_matrix.wrapped.Trsf()).Shape()
+        )
+        new_shape.wrapped = tcast(TOPODS, transformed)
+
+        return new_shape
+
+    def transformed(
+        self, rotate: VectorLike = (0, 0, 0), offset: VectorLike = (0, 0, 0)
+    ) -> Self:
+        """Transform Shape
+
+        Rotate and translate the Shape by the three angles (in degrees) and offset.
+
+        Args:
+            rotate (VectorLike, optional): 3-tuple of angles to rotate, in degrees.
+                Defaults to (0, 0, 0).
+            offset (VectorLike, optional): 3-tuple to offset. Defaults to (0, 0, 0).
+
+        Returns:
+            Shape: transformed object
+
+        """
+        # Convert to a Vector of radians
+        rotate_vector = Vector(rotate).multiply(DEG2RAD)
+        # Compute rotation matrix.
+        t_rx = gp_Trsf()
+        t_rx.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0)), rotate_vector.X)
+        t_ry = gp_Trsf()
+        t_ry.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0)), rotate_vector.Y)
+        t_rz = gp_Trsf()
+        t_rz.SetRotation(gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1)), rotate_vector.Z)
+        t_o = gp_Trsf()
+        t_o.SetTranslation(Vector(offset).wrapped)
+        return self._apply_transform(t_o * t_rx * t_ry * t_rz)
+
+    def translate(self, vector: VectorLike) -> Self:
+        """Translates this shape through a transformation.
+
+        Args:
+          vector: VectorLike:
+
+        Returns:
+
+        """
+
+        transformation = gp_Trsf()
+        transformation.SetTranslation(Vector(vector).wrapped)
+
+        return self._apply_transform(transformation)
+
+    def wire(self) -> Wire | None:
+        """Return the Wire"""
+        return None
+
+    def wires(self) -> ShapeList[Wire]:
+        """wires - all the wires in this Shape"""
+        return ShapeList()
+
+    def _apply_transform(self, transformation: gp_Trsf) -> Self:
+        """Private Apply Transform
+
+        Apply the provided transformation matrix to a copy of Shape
+
+        Args:
+            transformation (gp_Trsf): transformation matrix
+
+        Returns:
+            Shape: copy of transformed Shape
+        """
+        if self.wrapped is None:
+            return self
+        shape_copy: Shape = copy.deepcopy(self, None)
+        transformed_shape = BRepBuilderAPI_Transform(
+            self.wrapped,
+            transformation,
+            True,
+        ).Shape()
+        shape_copy.wrapped = tcast(TOPODS, downcast(transformed_shape))
+        return shape_copy
+
+    def _bool_op(
+        self,
+        args: Iterable[Shape],
+        tools: Iterable[Shape],
+        operation: BRepAlgoAPI_BooleanOperation | BRepAlgoAPI_Splitter,
+    ) -> Self | ShapeList[Self]:
+        """Generic boolean operation
+
+        Args:
+          args: Iterable[Shape]:
+          tools: Iterable[Shape]:
+          operation: Union[BRepAlgoAPI_BooleanOperation:
+          BRepAlgoAPI_Splitter]:
+
+        Returns:
+
+        """
+        args = list(args)
+        tools = list(tools)
+        # Find the highest order class from all the inputs Solid > Vertex
+        order_dict = {type(s): type(s).order for s in [self] + args + tools}
+        highest_order = sorted(order_dict.items(), key=lambda item: item[1])[-1]
+
+        # The base of the operation
+        base = args[0] if isinstance(args, (list, tuple)) else args
+
+        arg = TopTools_ListOfShape()
+        for obj in args:
+            if obj.wrapped is not None:
+                arg.Append(obj.wrapped)
+
+        tool = TopTools_ListOfShape()
+        for obj in tools:
+            if obj.wrapped is not None:
+                tool.Append(obj.wrapped)
+
+        operation.SetArguments(arg)
+        operation.SetTools(tool)
+
+        operation.SetRunParallel(True)
+        operation.Build()
+
+        topo_result = downcast(operation.Shape())
+
+        # Clean
+        if SkipClean.clean:
+            upgrader = ShapeUpgrade_UnifySameDomain(topo_result, True, True, True)
+            upgrader.AllowInternalEdges(False)
+            try:
+                upgrader.Build()
+                topo_result = downcast(upgrader.Shape())
+            except Exception:
+                warnings.warn("Boolean operation unable to clean", stacklevel=2)
+
+        # Remove unnecessary TopoDS_Compound around single shape
+        if isinstance(topo_result, TopoDS_Compound):
+            topo_result = unwrap_topods_compound(topo_result, True)
+
+        if isinstance(topo_result, TopoDS_Compound) and highest_order[1] != 4:
+            results = ShapeList(
+                highest_order[0].cast(s)
+                for s in get_top_level_topods_shapes(topo_result)
+            )
+            for result in results:
+                base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+            return results
+
+        result = highest_order[0].cast(topo_result)
+        base.copy_attributes_to(result, ["wrapped", "_NodeMixin__children"])
+
+        return result
+
+    def _ocp_section(
+        self: Shape, other: Vertex | Edge | Wire | Face
+    ) -> tuple[list[Vertex], list[Edge]]:
+        """_ocp_section
+
+        Create a BRepAlgoAPI_Section object
+
+        The algorithm is to build a Section operation between arguments and tools.
+        The result of Section operation consists of vertices and edges. The result
+        of Section operation contains:
+        - new vertices that are subjects of V/V, E/E, E/F, F/F interferences
+        - vertices that are subjects of V/E, V/F interferences
+        - new edges that are subjects of F/F interferences
+        - edges that are Common Blocks
+
+
+        Args:
+            other (Union[Vertex, Edge, Wire, Face]): shape to section with
+
+        Returns:
+            tuple[list[Vertex], list[Edge]]: section results
+        """
+        if self.wrapped is None or other.wrapped is None:
+            return ([], [])
+
+        try:
+            section = BRepAlgoAPI_Section(other.geom_adaptor(), self.wrapped)
+        except (TypeError, AttributeError):
+            try:
+                section = BRepAlgoAPI_Section(self.geom_adaptor(), other.wrapped)
+            except (TypeError, AttributeError):
+                return ([], [])
+
+        # Perform the intersection calculation
+        section.Build()
+
+        # Get the resulting shapes from the intersection
+        intersection_shape = section.Shape()
+
+        vertices = []
+        # Iterate through the intersection shape to find intersection points/edges
+        explorer = TopExp_Explorer(intersection_shape, TopAbs_ShapeEnum.TopAbs_VERTEX)
+        while explorer.More():
+            vertices.append(self.__class__.cast(downcast(explorer.Current())))
+            explorer.Next()
+        edges = []
+        explorer = TopExp_Explorer(intersection_shape, TopAbs_ShapeEnum.TopAbs_EDGE)
+        while explorer.More():
+            edges.append(self.__class__.cast(downcast(explorer.Current())))
+            explorer.Next()
+
+        return (vertices, edges)
+
+    def _repr_javascript_(self):
+        """Jupyter 3D representation support"""
+
+        from build123d.jupyter_tools import display
+
+        return display(self)._repr_javascript_()
+
+
+class Comparable(ABC):
+    """Abstract base class that requires comparison methods"""
+
+    # ---- Instance Methods ----
+
+    @abstractmethod
+    def __eq__(self, other: Any) -> bool: ...
+
+    @abstractmethod
+    def __lt__(self, other: Any) -> bool: ...
+
+
+# This TypeVar allows IDEs to see the type of objects within the ShapeList
+T = TypeVar("T", bound=Union[Shape, Vector])
+K = TypeVar("K", bound=Comparable)
+
+
+class ShapePredicate(Protocol):
+    """Predicate for shape filters"""
+
+    # ---- Instance Methods ----
+
+    def __call__(self, shape: Shape) -> bool: ...
+
+
+class GroupBy(Generic[T, K]):
+    """Result of a Shape.groupby operation. Groups can be accessed by index or key"""
+
+    # ---- Constructor ----
+
+    def __init__(
+        self,
+        key_f: Callable[[T], K],
+        shapelist: Iterable[T],
+        *,
+        reverse: bool = False,
+    ):
+        # can't be a dict because K may not be hashable
+        self.key_to_group_index: list[tuple[K, int]] = []
+        self.groups: list[ShapeList[T]] = []
+        self.key_f = key_f
+
+        for i, (key, shapegroup) in enumerate(
+            itertools.groupby(sorted(shapelist, key=key_f, reverse=reverse), key=key_f)
+        ):
+            self.groups.append(ShapeList(shapegroup))
+            self.key_to_group_index.append((key, i))
+
+    # ---- Instance Methods ----
+
+    def __getitem__(self, key: int):
+        return self.groups[key]
+
+    def __iter__(self):
+        return iter(self.groups)
+
+    def __len__(self):
+        return len(self.groups)
+
+    def __repr__(self):
+        return repr(ShapeList(self))
+
+    def __str__(self):
+        return pretty(self)
+
+    def group(self, key: K):
+        """Select group by key"""
+        for k, i in self.key_to_group_index:
+            if key == k:
+                return self.groups[i]
+        raise KeyError(key)
+
+    def group_for(self, shape: T):
+        """Select group by shape"""
+        return self.group(self.key_f(shape))
+
+    def _repr_pretty_(self, printer: PrettyPrinter, cycle: bool = False) -> None:
+        """
+        Render a formatted representation of the object for pretty-printing in
+        interactive environments.
+
+        Args:
+            printer (PrettyPrinter): The pretty printer instance handling the output.
+            cycle (bool): Indicates if a reference cycle is detected to
+                prevent infinite recursion.
+        """
+        if cycle:
+            printer.text("(...)")
+        else:
+            with printer.group(1, "[", "]"):
+                for idx, item in enumerate(self):
+                    if idx:
+                        printer.text(",")
+                        printer.breakable()
+                    printer.pretty(item)
+
+
+class ShapeList(list[T]):
+    """Subclass of list with custom filter and sort methods appropriate to CAD"""
+
+    # ---- Properties ----
+
+    # pylint: disable=too-many-public-methods
+
+    @property
+    def first(self) -> T:
+        """First element in the ShapeList"""
+        return self[0]
+
+    @property
+    def last(self) -> T:
+        """Last element in the ShapeList"""
+        return self[-1]
+
+    # ---- Instance Methods ----
+
+    def __add__(self, other: ShapeList) -> ShapeList[T]:  # type: ignore
+        """Combine two ShapeLists together operator +"""
+        # return ShapeList(itertools.chain(self, other)) # breaks MacOS-13
+        return ShapeList(list(self) + list(other))
+
+    def __and__(self, other: ShapeList) -> ShapeList[T]:
+        """Intersect two ShapeLists operator &"""
+        return ShapeList(set(self) & set(other))
+
+    def __eq__(self, other: object) -> bool:
+        """ShapeLists equality operator =="""
+        return (
+            set(self) == set(other) if isinstance(other, ShapeList) else NotImplemented  # type: ignore
+        )
+
+    @overload
+    def __getitem__(self, key: SupportsIndex) -> T: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> ShapeList[T]: ...
+
+    def __getitem__(self, key: SupportsIndex | slice) -> T | ShapeList[T]:
+        """Return slices of ShapeList as ShapeList"""
+        if isinstance(key, slice):
+            return ShapeList(list(self).__getitem__(key))
+        return list(self).__getitem__(key)
+
+    def __gt__(self, sort_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:  # type: ignore
+        """Sort operator >"""
+        return self.sort_by(sort_by)
+
+    def __lshift__(self, group_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:
+        """Group and select smallest group operator <<"""
+        return self.group_by(group_by)[0]
+
+    def __lt__(self, sort_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:  # type: ignore
+        """Reverse sort operator <"""
+        return self.sort_by(sort_by, reverse=True)
+
+    # Normally implementing __eq__ is enough, but ShapeList subclasses list,
+    # which already implements __ne__, so we need to override it, too
+    def __ne__(self, other: ShapeList) -> bool:  # type: ignore
+        """ShapeLists inequality operator !="""
+        return (
+            set(self) != set(other) if isinstance(other, ShapeList) else NotImplemented
+        )
+
+    def __or__(self, filter_by: Axis | GeomType = Axis.Z) -> ShapeList[T]:
+        """Filter by axis or geomtype operator |"""
+        return self.filter_by(filter_by)
+
+    def __rshift__(self, group_by: Axis | SortBy = Axis.Z) -> ShapeList[T]:
+        """Group and select largest group operator >>"""
+        return self.group_by(group_by)[-1]
+
+    def __sub__(self, other: ShapeList) -> ShapeList[T]:
+        """Differences between two ShapeLists operator -"""
+        return ShapeList(set(self) - set(other))
+
+    def center(self) -> Vector:
+        """The average of the center of objects within the ShapeList"""
+        if not self:
+            return Vector(0, 0, 0)
+
+        total_center = sum((o.center() for o in self), Vector(0, 0, 0))
+        return total_center / len(self)
+
+    def compound(self) -> Compound:
+        """Return the Compound"""
+        compounds = self.compounds()
+        compound_count = len(compounds)
+        if compound_count != 1:
+            warnings.warn(
+                f"Found {compound_count} compounds, returning first", stacklevel=2
+            )
+        return compounds[0]
+
+    def compounds(self) -> ShapeList[Compound]:
+        """compounds - all the compounds in this ShapeList"""
+        return ShapeList([c for shape in self for c in shape.compounds()])  # type: ignore
+
+    def edge(self) -> Edge:
+        """Return the Edge"""
+        edges = self.edges()
+        edge_count = len(edges)
+        if edge_count != 1:
+            warnings.warn(f"Found {edge_count} edges, returning first", stacklevel=2)
+        return edges[0]
+
+    def edges(self) -> ShapeList[Edge]:
+        """edges - all the edges in this ShapeList"""
+        return ShapeList([e for shape in self for e in shape.edges()])  # type: ignore
+
+    def face(self) -> Face:
+        """Return the Face"""
+        faces = self.faces()
+        face_count = len(faces)
+        if face_count != 1:
+            msg = f"Found {face_count} faces, returning first"
+            warnings.warn(msg, stacklevel=2)
+        return faces[0]
+
+    def faces(self) -> ShapeList[Face]:
+        """faces - all the faces in this ShapeList"""
+        return ShapeList([f for shape in self for f in shape.faces()])  # type: ignore
+
+    def filter_by(
+        self,
+        filter_by: ShapePredicate | Axis | Plane | GeomType,
+        reverse: bool = False,
+        tolerance: float = 1e-5,
+    ) -> ShapeList[T]:
+        """filter by Axis, Plane, or GeomType
+
+        Either:
+        - filter objects of type planar Face or linear Edge by their normal or tangent
+        (respectively) and sort the results by the given axis, or
+        - filter the objects by the provided type. Note that not all types apply to all
+        objects.
+
+        Args:
+            filter_by (Union[Axis,Plane,GeomType]): axis, plane, or geom type to filter
+                and possibly sort by. Filtering by a plane returns faces/edges parallel
+                to that plane.
+            reverse (bool, optional): invert the geom type filter. Defaults to False.
+            tolerance (float, optional): maximum deviation from axis. Defaults to 1e-5.
+
+        Raises:
+            ValueError: Invalid filter_by type
+
+        Returns:
+            ShapeList: filtered list of objects
+        """
+
+        # could be moved out maybe?
+        def axis_parallel_predicate(axis: Axis, tolerance: float):
+            def pred(shape: Shape):
+                if shape.is_planar_face:
+                    assert shape.wrapped is not None and isinstance(
+                        shape.wrapped, TopoDS_Face
+                    )
+                    gp_pnt = gp_Pnt()
+                    surface_normal = gp_Vec()
+                    u_val, _, v_val, _ = BRepTools.UVBounds_s(shape.wrapped)
+                    BRepGProp_Face(shape.wrapped).Normal(
+                        u_val, v_val, gp_pnt, surface_normal
+                    )
+                    normalized_surface_normal = Vector(
+                        surface_normal.X(), surface_normal.Y(), surface_normal.Z()
+                    ).normalized()
+                    shape_axis = Axis(shape.center(), normalized_surface_normal)
+                elif (
+                    isinstance(shape.wrapped, TopoDS_Edge)
+                    and shape.geom_type == GeomType.LINE
+                ):
+                    curve = shape.geom_adaptor()
+                    umin = curve.FirstParameter()
+                    tmp = gp_Pnt()
+                    res = gp_Vec()
+                    curve.D1(umin, tmp, res)
+                    start_pos = Vector(tmp)
+                    start_dir = Vector(gp_Dir(res))
+                    shape_axis = Axis(start_pos, start_dir)
+                else:
+                    return False
+                return axis.is_parallel(shape_axis, tolerance)
+
+            return pred
+
+        def plane_parallel_predicate(plane: Plane, tolerance: float):
+            plane_axis = Axis(plane.origin, plane.z_dir)
+            plane_xyz = plane.z_dir.wrapped.XYZ()
+
+            def pred(shape: Shape):
+                if shape.is_planar_face:
+                    assert shape.wrapped is not None and isinstance(
+                        shape.wrapped, TopoDS_Face
+                    )
+                    gp_pnt: gp_Pnt = gp_Pnt()
+                    surface_normal: gp_Vec = gp_Vec()
+                    u_val, _, v_val, _ = BRepTools.UVBounds_s(shape.wrapped)
+                    BRepGProp_Face(shape.wrapped).Normal(
+                        u_val, v_val, gp_pnt, surface_normal
+                    )
+                    normalized_surface_normal = Vector(surface_normal).normalized()
+                    shape_axis = Axis(shape.center(), normalized_surface_normal)
+                    return plane_axis.is_parallel(shape_axis, tolerance)
+                if isinstance(shape.wrapped, TopoDS_Wire):
+                    return all(pred(e) for e in shape.edges())
+                if isinstance(shape.wrapped, TopoDS_Edge):
+                    for curve in shape.wrapped.TShape().Curves():
+                        if curve.IsCurve3D():
+                            return ShapeAnalysis_Curve.IsPlanar_s(
+                                curve.Curve3D(), plane_xyz, tolerance
+                            )
+                    return False
+                return False
+
+            return pred
+
+        # convert input to callable predicate
+        if callable(filter_by):
+            predicate = filter_by
+        elif isinstance(filter_by, Axis):
+            predicate = axis_parallel_predicate(filter_by, tolerance=tolerance)
+        elif isinstance(filter_by, Plane):
+            predicate = plane_parallel_predicate(filter_by, tolerance=tolerance)
+        elif isinstance(filter_by, GeomType):
+
+            def predicate(obj):
+                return obj.geom_type == filter_by
+
+        else:
+            raise ValueError(f"Unsupported filter_by predicate: {filter_by}")
+
+        # final predicate is negated if `reverse=True`
+        if reverse:
+
+            def actual_predicate(shape):
+                return not predicate(shape)
+
+        else:
+            actual_predicate = predicate
+
+        return ShapeList(filter(actual_predicate, self))
+
+    def filter_by_position(
+        self,
+        axis: Axis,
+        minimum: float,
+        maximum: float,
+        inclusive: tuple[bool, bool] = (True, True),
+    ) -> ShapeList[T]:
+        """filter by position
+
+        Filter and sort objects by the position of their centers along given axis.
+        min and max values can be inclusive or exclusive depending on the inclusive tuple.
+
+        Args:
+            axis (Axis): axis to sort by
+            minimum (float): minimum value
+            maximum (float): maximum value
+            inclusive (tuple[bool, bool], optional): include min,max values.
+                Defaults to (True, True).
+
+        Returns:
+            ShapeList: filtered object list
+        """
+        if inclusive == (True, True):
+            objects = filter(
+                lambda o: minimum
+                <= axis.to_plane().to_local_coords(o).center().Z
+                <= maximum,
+                self,
+            )
+        elif inclusive == (True, False):
+            objects = filter(
+                lambda o: minimum
+                <= axis.to_plane().to_local_coords(o).center().Z
+                < maximum,
+                self,
+            )
+        elif inclusive == (False, True):
+            objects = filter(
+                lambda o: minimum
+                < axis.to_plane().to_local_coords(o).center().Z
+                <= maximum,
+                self,
+            )
+        elif inclusive == (False, False):
+            objects = filter(
+                lambda o: minimum
+                < axis.to_plane().to_local_coords(o).center().Z
+                < maximum,
+                self,
+            )
+
+        return ShapeList(objects).sort_by(axis)
+
+    def group_by(
+        self,
+        group_by: Callable[[Shape], K] | Axis | Edge | Wire | SortBy = Axis.Z,
+        reverse=False,
+        tol_digits=6,
+    ) -> GroupBy[T, K]:
+        """group by
+
+        Group objects by provided criteria and then sort the groups according to the criteria.
+        Note that not all group_by criteria apply to all objects.
+
+        Args:
+            group_by (SortBy, optional): group and sort criteria. Defaults to Axis.Z.
+            reverse (bool, optional): flip order of sort. Defaults to False.
+            tol_digits (int, optional): Tolerance for building the group keys by
+                round(key, tol_digits)
+
+        Returns:
+            GroupBy[K, ShapeList]: sorted list of ShapeLists
+        """
+
+        if isinstance(group_by, Axis):
+            if group_by.wrapped is None:
+                raise ValueError("Cannot group by an empty axis")
+            assert group_by.location is not None
+            axis_as_location = group_by.location.inverse()
+
+            def key_f(obj):
+                return round(
+                    (axis_as_location * Location(obj.center())).position.Z,
+                    tol_digits,
+                )
+
+        elif hasattr(group_by, "wrapped"):
+            if group_by.wrapped is None:
+                raise ValueError("Cannot group by an empty object")
+
+            if isinstance(group_by.wrapped, (TopoDS_Edge, TopoDS_Wire)):
+
+                def key_f(obj):
+                    pnt1, _pnt2 = group_by.closest_points(obj.center())
+                    return round(group_by.param_at_point(pnt1), tol_digits)
+
+        elif isinstance(group_by, SortBy):
+            if group_by == SortBy.LENGTH:
+
+                def key_f(obj):
+                    return round(obj.length, tol_digits)
+
+            elif group_by == SortBy.RADIUS:
+
+                def key_f(obj):
+                    return round(obj.radius, tol_digits)
+
+            elif group_by == SortBy.DISTANCE:
+
+                def key_f(obj):
+                    return round(obj.center().length, tol_digits)
+
+            elif group_by == SortBy.AREA:
+
+                def key_f(obj):
+                    return round(obj.area, tol_digits)
+
+            elif group_by == SortBy.VOLUME:
+
+                def key_f(obj):
+                    return round(obj.volume, tol_digits)
+
+        elif callable(group_by):
+            key_f = group_by
+
+        else:
+            raise ValueError(f"Unsupported group_by function: {group_by}")
+
+        return GroupBy(key_f, self, reverse=reverse)
+
+    def shell(self) -> Shell:
+        """Return the Shell"""
+        shells = self.shells()
+        shell_count = len(shells)
+        if shell_count != 1:
+            warnings.warn(f"Found {shell_count} shells, returning first", stacklevel=2)
+        return shells[0]
+
+    def shells(self) -> ShapeList[Shell]:
+        """shells - all the shells in this ShapeList"""
+        return ShapeList([s for shape in self for s in shape.shells()])  # type: ignore
+
+    def solid(self) -> Solid:
+        """Return the Solid"""
+        solids = self.solids()
+        solid_count = len(solids)
+        if solid_count != 1:
+            warnings.warn(f"Found {solid_count} solids, returning first", stacklevel=2)
+        return solids[0]
+
+    def solids(self) -> ShapeList[Solid]:
+        """solids - all the solids in this ShapeList"""
+        return ShapeList([s for shape in self for s in shape.solids()])  # type: ignore
+
+    def sort_by(
+        self, sort_by: Axis | Edge | Wire | SortBy = Axis.Z, reverse: bool = False
+    ) -> ShapeList[T]:
+        """sort by
+
+        Sort objects by provided criteria. Note that not all sort_by criteria apply to all
+        objects.
+
+        Args:
+            sort_by (SortBy, optional): sort criteria. Defaults to SortBy.Z.
+            reverse (bool, optional): flip order of sort. Defaults to False.
+
+        Returns:
+            ShapeList: sorted list of objects
+        """
+
+        if isinstance(sort_by, Axis):
+            if sort_by.wrapped is None:
+                raise ValueError("Cannot sort by an empty axis")
+            assert sort_by.location is not None
+            axis_as_location = sort_by.location.inverse()
+            objects = sorted(
+                self,
+                key=lambda o: (axis_as_location * Location(o.center())).position.Z,
+                reverse=reverse,
+            )
+        elif hasattr(sort_by, "wrapped"):
+            if sort_by.wrapped is None:
+                raise ValueError("Cannot sort by an empty object")
+
+            if isinstance(sort_by.wrapped, (TopoDS_Edge, TopoDS_Wire)):
+
+                def u_of_closest_center(obj) -> float:
+                    """u-value of closest point between object center and sort_by"""
+                    assert not isinstance(sort_by, SortBy)
+                    pnt1, _pnt2 = sort_by.closest_points(obj.center())
+                    return sort_by.param_at_point(pnt1)
+
+                # pylint: disable=unnecessary-lambda
+                objects = sorted(
+                    self, key=lambda o: u_of_closest_center(o), reverse=reverse
+                )
+
+        elif isinstance(sort_by, SortBy):
+            if sort_by == SortBy.LENGTH:
+                objects = sorted(
+                    self,
+                    key=lambda obj: obj.length,
+                    reverse=reverse,
+                )
+            elif sort_by == SortBy.RADIUS:
+                with_radius = [obj for obj in self if hasattr(obj, "radius")]
+                objects = sorted(
+                    with_radius,
+                    key=lambda obj: obj.radius,  # type: ignore
+                    reverse=reverse,
+                )
+            elif sort_by == SortBy.DISTANCE:
+                objects = sorted(
+                    self,
+                    key=lambda obj: obj.center().length,
+                    reverse=reverse,
+                )
+            elif sort_by == SortBy.AREA:
+                with_area = [obj for obj in self if hasattr(obj, "area")]
+                objects = sorted(
+                    with_area,
+                    key=lambda obj: obj.area,  # type: ignore
+                    reverse=reverse,
+                )
+            elif sort_by == SortBy.VOLUME:
+                with_volume = [obj for obj in self if hasattr(obj, "volume")]
+                objects = sorted(
+                    with_volume,
+                    key=lambda obj: obj.volume,  # type: ignore
+                    reverse=reverse,
+                )
+
+        return ShapeList(objects)
+
+    def sort_by_distance(
+        self, other: Shape | VectorLike, reverse: bool = False
+    ) -> ShapeList[T]:
+        """Sort by distance
+
+        Sort by minimal distance between objects and other
+
+        Args:
+            other (Union[Shape,VectorLike]): reference object
+            reverse (bool, optional): flip order of sort. Defaults to False.
+
+        Returns:
+            ShapeList: Sorted shapes
+        """
+        distances = sorted(
+            [(obj.distance_to(other), obj) for obj in self],  # type: ignore
+            key=lambda obj: obj[0],
+            reverse=reverse,
+        )
+        return ShapeList([obj[1] for obj in distances])
+
+    def vertex(self) -> Vertex:
+        """Return the Vertex"""
+        vertices = self.vertices()
+        vertex_count = len(vertices)
+        if vertex_count != 1:
+            warnings.warn(
+                f"Found {vertex_count} vertices, returning first", stacklevel=2
+            )
+        return vertices[0]
+
+    def vertices(self) -> ShapeList[Vertex]:
+        """vertices - all the vertices in this ShapeList"""
+        return ShapeList([v for shape in self for v in shape.vertices()])  # type: ignore
+
+    def wire(self) -> Wire:
+        """Return the Wire"""
+        wires = self.wires()
+        wire_count = len(wires)
+        if wire_count != 1:
+            warnings.warn(f"Found {wire_count} wires, returning first", stacklevel=2)
+        return wires[0]
+
+    def wires(self) -> ShapeList[Wire]:
+        """wires - all the wires in this ShapeList"""
+        return ShapeList([w for shape in self for w in shape.wires()])  # type: ignore
+
+
+class Joint(ABC):
+    """Joint
+
+    Abstract Base Joint class - used to join two components together
+
+    Args:
+        parent (Union[Solid, Compound]): object that joint to bound to
+
+    Attributes:
+        label (str): user assigned label
+        parent (Shape): object joint is bound to
+        connected_to (Joint): joint that is connect to this joint
+
+    """
+
+    # ---- Constructor ----
+
+    def __init__(self, label: str, parent: Solid | Compound):
+        self.label = label
+        self.parent = parent
+        self.connected_to: Joint | None = None
+
+    # ---- Properties ----
+
+    @property
+    @abstractmethod
+    def location(self) -> Location:
+        """Location of joint"""
+
+    @property
+    @abstractmethod
+    def symbol(self) -> Compound:
+        """A CAD object positioned in global space to illustrate the joint"""
+
+    # ---- Instance Methods ----
+
+    @abstractmethod
+    def connect_to(self, other: Joint):
+        """All derived classes must provide a connect_to method"""
+
+    @abstractmethod
+    def relative_to(self, other: Joint) -> Location:
+        """Return relative location to another joint"""
+
+    def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
+        """Connect Joint self by repositioning other"""
+
+        if not isinstance(other, Joint):
+            raise TypeError(f"other must of type Joint not {type(other)}")
+        if self.parent.location is None:
+            raise ValueError("Parent location is not set")
+        relative_location = self.relative_to(other, **kwargs)
+        other.parent.locate(self.parent.location * relative_location)
+        self.connected_to = other
+
+
+class SkipClean:
+    """Skip clean context for use in operator driven code where clean=False wouldn't work"""
+
+    clean = True
+    # ---- Instance Methods ----
+
+    def __enter__(self):
+        SkipClean.clean = False
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        SkipClean.clean = True
+
+
+def _sew_topods_faces(faces: Iterable[TopoDS_Face]) -> TopoDS_Shape:
+    """Sew faces into a shell if possible"""
+    shell_builder = BRepBuilderAPI_Sewing()
+    for face in faces:
+        shell_builder.Add(face)
+    shell_builder.Perform()
+    return downcast(shell_builder.SewedShape())
+
+
+def _topods_entities(shape: TopoDS_Shape, topo_type: Shapes) -> list[TopoDS_Shape]:
+    """Return the TopoDS_Shapes of topo_type from this TopoDS_Shape"""
+    out = {}  # using dict to prevent duplicates
+
+    explorer = TopExp_Explorer(shape, Shape.inverse_shape_LUT[topo_type])
+
+    while explorer.More():
+        item = explorer.Current()
+        out[item.HashCode(HASH_CODE_MAX)] = (
+            item  # needed to avoid pseudo-duplicate entities
+        )
+        explorer.Next()
+
+    return list(out.values())
+
+
+def _topods_face_normal_at(face: TopoDS_Face, surface_point: gp_Pnt) -> Vector:
+    """Find the normal at a point on surface"""
+    surface = BRep_Tool.Surface_s(face)
+
+    # project point on surface
+    projector = GeomAPI_ProjectPointOnSurf(surface_point, surface)
+    u_val, v_val = projector.LowerDistanceParameters()
+
+    gp_pnt = gp_Pnt()
+    normal = gp_Vec()
+    BRepGProp_Face(face).Normal(u_val, v_val, gp_pnt, normal)
+
+    return Vector(normal).normalized()
+
+
+def downcast(obj: TopoDS_Shape) -> TopoDS_Shape:
+    """Downcasts a TopoDS object to suitable specialized type
+
+    Args:
+      obj: TopoDS_Shape:
+
+    Returns:
+
+    """
+
+    f_downcast: Any = Shape.downcast_LUT[shapetype(obj)]
+    return_value = f_downcast(obj)
+
+    return return_value
+
+
+def fix(obj: TopoDS_Shape) -> TopoDS_Shape:
+    """Fix a TopoDS object to suitable specialized type
+
+    Args:
+      obj: TopoDS_Shape:
+
+    Returns:
+
+    """
+
+    shape_fix = ShapeFix_Shape(obj)
+    shape_fix.Perform()
+
+    return downcast(shape_fix.Shape())
+
+
+def get_top_level_topods_shapes(
+    topods_shape: TopoDS_Shape | None,
+) -> list[TopoDS_Shape]:
+    """
+    Retrieve the first level of child shapes from the shape.
+
+    This method collects all the non-compound shapes directly contained in the
+    current shape. If the wrapped shape is a `TopoDS_Compound`, it traverses
+    its immediate children and collects all shapes that are not further nested
+    compounds. Nested compounds are traversed to gather their non-compound elements
+    without returning the nested compound itself.
+
+    Returns:
+        list[TopoDS_Shape]: A list of all first-level non-compound child shapes.
+
+    Example:
+        If the current shape is a compound containing both simple shapes
+        (e.g., edges, vertices) and other compounds, the method returns a list
+        of only the simple shapes directly contained at the top level.
+    """
+    if topods_shape is None:
+        return ShapeList()
+
+    first_level_shapes = []
+    stack = [topods_shape]
+
+    while stack:
+        current_shape = stack.pop()
+        if isinstance(current_shape, TopoDS_Compound):
+            iterator = TopoDS_Iterator()
+            iterator.Initialize(current_shape)
+            while iterator.More():
+                child_shape = downcast(iterator.Value())
+                if isinstance(child_shape, TopoDS_Compound):
+                    # Traverse further into the compound
+                    stack.append(child_shape)
+                else:
+                    # Add non-compound shape
+                    first_level_shapes.append(child_shape)
+                iterator.Next()
+        else:
+            first_level_shapes.append(current_shape)
+
+    return first_level_shapes
+
+
+def shapetype(obj: TopoDS_Shape | None) -> TopAbs_ShapeEnum:
+    """Return TopoDS_Shape's TopAbs_ShapeEnum"""
+    if obj is None or obj.IsNull():
+        raise ValueError("Null TopoDS_Shape object")
+
+    return obj.ShapeType()
+
+
+def topods_dim(topods: TopoDS_Shape) -> int | None:
+    """Return the dimension of this TopoDS_Shape"""
+    shape_dim_map = {
+        (TopoDS_Vertex,): 0,
+        (TopoDS_Edge, TopoDS_Wire): 1,
+        (TopoDS_Face, TopoDS_Shell): 2,
+        (TopoDS_Solid,): 3,
+    }
+
+    for shape_types, dim in shape_dim_map.items():
+        if isinstance(topods, shape_types):
+            return dim
+
+    if isinstance(topods, TopoDS_Compound):
+        sub_dims = {topods_dim(s) for s in get_top_level_topods_shapes(topods)}
+        return sub_dims.pop() if len(sub_dims) == 1 else None
+
+    return None
+
+
+def unwrap_topods_compound(
+    compound: TopoDS_Compound, fully: bool = True
+) -> TopoDS_Compound | TopoDS_Shape:
+    """Strip unnecessary Compound wrappers
+
+    Args:
+        compound (TopoDS_Compound): The TopoDS_Compound to unwrap.
+        fully (bool, optional): return base shape without any TopoDS_Compound
+            wrappers (otherwise one TopoDS_Compound is left). Defaults to True.
+
+    Returns:
+        TopoDS_Compound | TopoDS_Shape: base shape
+    """
+    if compound.NbChildren() == 1:
+        iterator = TopoDS_Iterator(compound)
+        single_element = downcast(iterator.Value())
+
+        # If the single element is another TopoDS_Compound, unwrap it recursively
+        if isinstance(single_element, TopoDS_Compound):
+            return unwrap_topods_compound(single_element, fully)
+
+        return single_element if fully else compound
+
+    # If there are no elements or more than one element, return TopoDS_Compound
+    return compound
