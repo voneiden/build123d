@@ -729,27 +729,27 @@ class Triangle(BaseSketchObject):
             raise ValueError("One length and two other values must be provided")
 
         A, B, C = (radians(angle) if angle is not None else None for angle in [A, B, C])
-        a2, b2, c2, A2, B2, C2 = trianglesolver.solve(a, b, c, A, B, C)
-        self.a = a2  #: length of side 'a'
-        self.b = b2  #: length of side 'b'
-        self.c = c2  #: length of side 'c'
-        self.A = degrees(A2)  #: interior angle 'A' in degrees
-        self.B = degrees(B2)  #: interior angle 'B' in degrees
-        self.C = degrees(C2)  #: interior angle 'C' in degrees
+        ar, br, cr, Ar, Br, Cr = trianglesolver.solve(a, b, c, A, B, C)
+        self.a = ar  #: length of side 'a'
+        self.b = br  #: length of side 'b'
+        self.c = cr  #: length of side 'c'
+        self.A = degrees(Ar)  #: interior angle 'A' in degrees
+        self.B = degrees(Br)  #: interior angle 'B' in degrees
+        self.C = degrees(Cr)  #: interior angle 'C' in degrees
         triangle = Face(
             Wire.make_polygon(
-                [Vector(0, 0), Vector(a, 0), Vector(c, 0).rotate(Axis.Z, self.B)]
+                [Vector(0, 0), Vector(ar, 0), Vector(cr, 0).rotate(Axis.Z, self.B)]
             )
         )
         center_of_geometry = sum(Vector(v) for v in triangle.vertices()) / 3
         triangle.move(Location(-center_of_geometry))
         alignment = None if align is None else tuplify(align, 2)
         super().__init__(obj=triangle, rotation=rotation, align=alignment, mode=mode)
-        self.edge_a = self.edges().filter_by(lambda e: abs(e.length - a) < TOLERANCE)[
+        self.edge_a = self.edges().filter_by(lambda e: abs(e.length - ar) < TOLERANCE)[
             0
         ]  #: edge 'a'
         self.edge_b = self.edges().filter_by(
-            lambda e: abs(e.length - b) < TOLERANCE and e not in [self.edge_a]
+            lambda e: abs(e.length - br) < TOLERANCE and e not in [self.edge_a]
         )[
             0
         ]  #: edge 'b'
