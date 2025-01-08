@@ -3,8 +3,8 @@ import importlib
 from math import sqrt
 from build123d import *
 
-pytestmark = pytest.mark.skipif(importlib.util.find_spec("pytest_benchmark") is not None)
 
+pytest_benchmark = pytest.importorskip("pytest_benchmark")
 
 def test_ppp_0101(benchmark):
     def model():
