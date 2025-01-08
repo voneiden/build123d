@@ -42,15 +42,15 @@ import numpy as np
 from math import degrees, pi, radians
 from typing import (
     Any,
-    Iterable,
     List,
     Optional,
-    Sequence,
     Tuple,
     Union,
     overload,
     TypeVar,
 )
+
+from collections.abc import Iterable, Sequence
 
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
@@ -165,7 +165,7 @@ class Vector:
         ...
 
     @overload
-    def __init__(self, v: Union[gp_Vec, gp_Pnt, gp_Dir, gp_XYZ]):  # pragma: no cover
+    def __init__(self, v: gp_Vec | gp_Pnt | gp_Dir | gp_XYZ):  # pragma: no cover
         ...
 
     @overload
@@ -429,7 +429,7 @@ class Vector:
         """Vector length operator abs()"""
         return self.length
 
-    def __and__(self: Plane, other: Union[Axis, Location, Plane, VectorLike, "Shape"]):
+    def __and__(self: Plane, other: Axis | Location | Plane | VectorLike | Shape):
         """intersect vector with other &"""
         return self.intersect(other)
 
@@ -506,19 +506,19 @@ class Vector:
         return Vector(self.wrapped.Rotated(axis.wrapped, pi * angle / 180))
 
     @overload
-    def intersect(self, vector: VectorLike) -> Union[Vector, None]:
+    def intersect(self, vector: VectorLike) -> Vector | None:
         """Find intersection of vector and vector"""
 
     @overload
-    def intersect(self, location: Location) -> Union[Vector, None]:
+    def intersect(self, location: Location) -> Vector | None:
         """Find intersection of location and vector"""
 
     @overload
-    def intersect(self, axis: Axis) -> Union[Vector, None]:
+    def intersect(self, axis: Axis) -> Vector | None:
         """Find intersection of axis and vector"""
 
     @overload
-    def intersect(self, plane: Plane) -> Union[Vector, None]:
+    def intersect(self, plane: Plane) -> Vector | None:
         """Find intersection of plane and vector"""
 
     def intersect(self, *args, **kwargs):
@@ -597,7 +597,7 @@ class Axis(metaclass=AxisMeta):
         """Axis: point and direction"""
 
     @overload
-    def __init__(self, edge: "Edge"):  # pragma: no cover
+    def __init__(self, edge: Edge):  # pragma: no cover
         """Axis: start of Edge"""
 
     def __init__(self, *args, **kwargs):
@@ -774,24 +774,24 @@ class Axis(metaclass=AxisMeta):
         """Flip direction operator -"""
         return self.reverse()
 
-    def __and__(self: Plane, other: Union[Axis, Location, Plane, VectorLike, "Shape"]):
+    def __and__(self: Plane, other: Axis | Location | Plane | VectorLike | Shape):
         """intersect vector with other &"""
         return self.intersect(other)
 
     @overload
-    def intersect(self, vector: VectorLike) -> Union[Vector, None]:
+    def intersect(self, vector: VectorLike) -> Vector | None:
         """Find intersection of vector and axis"""
 
     @overload
-    def intersect(self, location: Location) -> Union[Location, None]:
+    def intersect(self, location: Location) -> Location | None:
         """Find intersection of location and axis"""
 
     @overload
-    def intersect(self, axis: Axis) -> Union[Axis, None]:
+    def intersect(self, axis: Axis) -> Axis | None:
         """Find intersection of axis and axis"""
 
     @overload
-    def intersect(self, plane: Plane) -> Union[Axis, None]:
+    def intersect(self, plane: Plane) -> Axis | None:
         """Find intersection of plane and axis"""
 
     def intersect(self, *args, **kwargs):
@@ -891,7 +891,7 @@ class BoundBox:
 
     def add(
         self,
-        obj: Union[tuple[float, float, float], Vector, BoundBox],
+        obj: tuple[float, float, float] | Vector | BoundBox,
         tol: float = None,
     ) -> BoundBox:
         """Returns a modified (expanded) bounding box
@@ -933,7 +933,7 @@ class BoundBox:
         return BoundBox(tmp)
 
     @staticmethod
-    def find_outside_box_2d(bb1: BoundBox, bb2: BoundBox) -> Optional[BoundBox]:
+    def find_outside_box_2d(bb1: BoundBox, bb2: BoundBox) -> BoundBox | None:
         """Compares bounding boxes
 
         Compares bounding boxes. Returns none if neither is inside the other.
@@ -1026,7 +1026,7 @@ class BoundBox:
             and second_box.max.Z < self.max.Z
         )
 
-    def to_align_offset(self, align: Union[Align2DType, Align3DType]) -> Vector:
+    def to_align_offset(self, align: Align2DType | Align3DType) -> Vector:
         """Amount to move object to achieve the desired alignment"""
         return to_align_offset(self.min.to_tuple(), self.max.to_tuple(), align)
 
@@ -1329,7 +1329,7 @@ class Location:
         self,
         translation: VectorLike,
         rotation: RotationLike,
-        ordering: Union[Extrinsic, Intrinsic],
+        ordering: Extrinsic | Intrinsic,
     ):  # pragma: no cover
         """Location with translation with respect to the original location.
         If rotation is not None then the location includes the rotation (see also Rotation class)
@@ -1502,7 +1502,7 @@ class Location:
         """Flip the orientation without changing the position operator -"""
         return Location(-Plane(self))
 
-    def __and__(self: Plane, other: Union[Axis, Location, Plane, VectorLike, "Shape"]):
+    def __and__(self: Plane, other: Axis | Location | Plane | VectorLike | Shape):
         """intersect axis with other &"""
         return self.intersect(other)
 
@@ -1532,8 +1532,8 @@ class Location:
         Returns:
             Location as String
         """
-        position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
+        position_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[0])
+        orientation_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[1])
         return f"(p=({position_str}), o=({orientation_str}))"
 
     def __str__(self):
@@ -1544,24 +1544,24 @@ class Location:
         Returns:
             Location as String
         """
-        position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
+        position_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[0])
+        orientation_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[1])
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
 
     @overload
-    def intersect(self, vector: VectorLike) -> Union[Vector, None]:
+    def intersect(self, vector: VectorLike) -> Vector | None:
         """Find intersection of vector and location"""
 
     @overload
-    def intersect(self, location: Location) -> Union[Location, None]:
+    def intersect(self, location: Location) -> Location | None:
         """Find intersection of location and location"""
 
     @overload
-    def intersect(self, axis: Axis) -> Union[Location, None]:
+    def intersect(self, axis: Axis) -> Location | None:
         """Find intersection of axis and location"""
 
     @overload
-    def intersect(self, plane: Plane) -> Union[Location, None]:
+    def intersect(self, plane: Plane) -> Location | None:
         """Find intersection of plane and location"""
 
     def intersect(self, *args, **kwargs):
@@ -1641,7 +1641,7 @@ class Rotation(Location):
     def __init__(
         self,
         rotation: RotationLike,
-        ordering: Union[Extrinsic, Intrinsic] == Intrinsic.XYZ,
+        ordering: Extrinsic | Intrinsic == Intrinsic.XYZ,
     ):
         """Subclass of Location used only for object rotation
         ordering is for order of rotations in Intrinsic or Extrinsic enums"""
@@ -1652,7 +1652,7 @@ class Rotation(Location):
         X: float = 0,
         Y: float = 0,
         Z: float = 0,
-        ordering: Union[Extrinsic, Intrinsic] = Intrinsic.XYZ,
+        ordering: Extrinsic | Intrinsic = Intrinsic.XYZ,
     ):
         """Subclass of Location used only for object rotation
         ordering is for order of rotations in Intrinsic or Extrinsic enums"""
@@ -1760,7 +1760,7 @@ class Matrix:
         ...
 
     @overload
-    def __init__(self, matrix: Union[gp_GTrsf, gp_Trsf]) -> None:  # pragma: no cover
+    def __init__(self, matrix: gp_GTrsf | gp_Trsf) -> None:  # pragma: no cover
         ...
 
     @overload
@@ -2016,7 +2016,7 @@ class Plane(metaclass=PlaneMeta):
 
     @overload
     def __init__(
-        self, face: "Face", x_dir: Optional[VectorLike] = None
+        self, face: Face, x_dir: VectorLike | None = None
     ):  # pragma: no cover
         """Return a plane extending the face.
         Note: for non planar face this will return the underlying work plane"""
@@ -2181,8 +2181,8 @@ class Plane(metaclass=PlaneMeta):
         return Plane(self.origin, self.x_dir, -self.z_dir)
 
     def __mul__(
-        self, other: Union[Location, "Shape"]
-    ) -> Union[Plane, List[Plane], "Shape"]:
+        self, other: Location | Shape
+    ) -> Plane | list[Plane] | Shape:
         if isinstance(other, Location):
             result = Plane(self.location * other)
         elif (  # LocationList
@@ -2201,7 +2201,7 @@ class Plane(metaclass=PlaneMeta):
             )
         return result
 
-    def __and__(self: Plane, other: Union[Axis, Location, Plane, VectorLike, "Shape"]):
+    def __and__(self: Plane, other: Axis | Location | Plane | VectorLike | Shape):
         """intersect plane with other &"""
         return self.intersect(other)
 
@@ -2213,9 +2213,9 @@ class Plane(metaclass=PlaneMeta):
         Returns:
             Plane as String
         """
-        origin_str = ", ".join((f"{v:.2f}" for v in self._origin.to_tuple()))
-        x_dir_str = ", ".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
-        z_dir_str = ", ".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
+        origin_str = ", ".join(f"{v:.2f}" for v in self._origin.to_tuple())
+        x_dir_str = ", ".join(f"{v:.2f}" for v in self.x_dir.to_tuple())
+        z_dir_str = ", ".join(f"{v:.2f}" for v in self.z_dir.to_tuple())
         return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str}))"
 
     def reverse(self) -> Plane:
@@ -2236,7 +2236,7 @@ class Plane(metaclass=PlaneMeta):
             gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
         )
 
-    def shift_origin(self, locator: Union[Axis, VectorLike, "Vertex"]) -> Plane:
+    def shift_origin(self, locator: Axis | VectorLike | Vertex) -> Plane:
         """shift plane origin
 
         Creates a new plane with the origin moved within the plane to the point of intersection
@@ -2274,7 +2274,7 @@ class Plane(metaclass=PlaneMeta):
     def rotated(
         self,
         rotation: VectorLike = (0, 0, 0),
-        ordering: Union[Extrinsic, Intrinsic] = None,
+        ordering: Extrinsic | Intrinsic = None,
     ) -> Plane:
         """Returns a copy of this plane, rotated about the specified axes
 
@@ -2366,7 +2366,7 @@ class Plane(metaclass=PlaneMeta):
         return axis
 
     def _to_from_local_coords(
-        self, obj: Union[VectorLike, Any, BoundBox], to_from: bool = True
+        self, obj: VectorLike | Any | BoundBox, to_from: bool = True
     ):
         """_to_from_local_coords
 
@@ -2406,7 +2406,7 @@ class Plane(metaclass=PlaneMeta):
             )
         return return_value
 
-    def to_local_coords(self, obj: Union[VectorLike, Any, BoundBox]):
+    def to_local_coords(self, obj: VectorLike | Any | BoundBox):
         """Reposition the object relative to this plane
 
         Args:
@@ -2419,7 +2419,7 @@ class Plane(metaclass=PlaneMeta):
         """
         return self._to_from_local_coords(obj, True)
 
-    def from_local_coords(self, obj: Union[tuple, Vector, Any, BoundBox]):
+    def from_local_coords(self, obj: tuple | Vector | Any | BoundBox):
         """Reposition the object relative from this plane
 
         Args:
@@ -2442,7 +2442,7 @@ class Plane(metaclass=PlaneMeta):
         return Location(transformation)
 
     def contains(
-        self, obj: Union[VectorLike, Axis], tolerance: float = TOLERANCE
+        self, obj: VectorLike | Axis, tolerance: float = TOLERANCE
     ) -> bool:
         """contains
 
@@ -2467,23 +2467,23 @@ class Plane(metaclass=PlaneMeta):
         return return_value
 
     @overload
-    def intersect(self, vector: VectorLike) -> Union[Vector, None]:
+    def intersect(self, vector: VectorLike) -> Vector | None:
         """Find intersection of vector and plane"""
 
     @overload
-    def intersect(self, location: Location) -> Union[Location, None]:
+    def intersect(self, location: Location) -> Location | None:
         """Find intersection of location and plane"""
 
     @overload
-    def intersect(self, axis: Axis) -> Union[Axis, Vector, None]:
+    def intersect(self, axis: Axis) -> Axis | Vector | None:
         """Find intersection of axis and plane"""
 
     @overload
-    def intersect(self, plane: Plane) -> Union[Axis, None]:
+    def intersect(self, plane: Plane) -> Axis | None:
         """Find intersection of plane and plane"""
 
     @overload
-    def intersect(self, shape: "Shape") -> Union["Shape", None]:
+    def intersect(self, shape: Shape) -> Shape | None:
         """Find intersection of plane and shape"""
 
     def intersect(self, *args, **kwargs):
@@ -2536,8 +2536,8 @@ class Plane(metaclass=PlaneMeta):
 def to_align_offset(
     min_point: VectorLike,
     max_point: VectorLike,
-    align: Union[Align2DType, Align3DType],
-    center: Optional[VectorLike] = None,
+    align: Align2DType | Align3DType,
+    center: VectorLike | None = None,
 ) -> Vector:
     """Amount to move object to achieve the desired alignment"""
     align_offset = []

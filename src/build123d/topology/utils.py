@@ -54,7 +54,9 @@ license:
 from __future__ import annotations
 
 from math import radians, sin, cos, isclose
-from typing import Any, Iterable, Union, TYPE_CHECKING
+from typing import Any, Union, TYPE_CHECKING
+
+from collections.abc import Iterable
 
 from OCP.BRep import BRep_Tool
 from OCP.BRepAlgoAPI import (
@@ -136,7 +138,7 @@ def _extrude_topods_shape(obj: TopoDS_Shape, direction: VectorLike) -> TopoDS_Sh
 
 
 def _make_loft(
-    objs: Iterable[Union[Vertex, Wire]],
+    objs: Iterable[Vertex | Wire],
     filled: bool,
     ruled: bool = False,
 ) -> TopoDS_Shape:
@@ -323,8 +325,8 @@ def delta(shapes_one: Iterable[Shape], shapes_two: Iterable[Shape]) -> list[Shap
     """Compare the OCCT objects of each list and return the differences"""
     shapes_one = list(shapes_one)
     shapes_two = list(shapes_two)
-    occt_one = set(shape.wrapped for shape in shapes_one)
-    occt_two = set(shape.wrapped for shape in shapes_two)
+    occt_one = {shape.wrapped for shape in shapes_one}
+    occt_two = {shape.wrapped for shape in shapes_two}
     occt_delta = list(occt_one - occt_two)
 
     all_shapes = []
@@ -421,7 +423,7 @@ def tuplify(obj: Any, dim: int) -> tuple | None:
 def unwrapped_shapetype(obj: Shape) -> TopAbs_ShapeEnum:
     """Return Shape's TopAbs_ShapeEnum"""
     if isinstance(obj.wrapped, TopoDS_Compound):
-        shapetypes = set(shapetype(o.wrapped) for o in obj)
+        shapetypes = {shapetype(o.wrapped) for o in obj}
         if len(shapetypes) == 1:
             result = shapetypes.pop()
         else:

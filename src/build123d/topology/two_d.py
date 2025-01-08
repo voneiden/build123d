@@ -57,7 +57,9 @@ from __future__ import annotations
 
 import copy
 import warnings
-from typing import Any, Iterable, Sequence, Tuple, Union, overload, TYPE_CHECKING
+from typing import Any, Tuple, Union, overload, TYPE_CHECKING
+
+from collections.abc import Iterable, Sequence
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
@@ -631,7 +633,7 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
         cls,
         points: list[list[VectorLike]],
         tol: float = 1e-2,
-        smoothing: Tuple[float, float, float] | None = None,
+        smoothing: tuple[float, float, float] | None = None,
         min_deg: int = 1,
         max_deg: int = 3,
     ) -> Face:
@@ -1219,7 +1221,7 @@ class Face(Mixin2D, Shape[TopoDS_Face]):
             )
         return self.outer_wire()
 
-    def _uv_bounds(self) -> Tuple[float, float, float, float]:
+    def _uv_bounds(self) -> tuple[float, float, float, float]:
         """Return the u min, u max, v min, v max values"""
         return BRepTools.UVBounds_s(self.wrapped)
 
@@ -1305,7 +1307,7 @@ class Shell(Mixin2D, Shape[TopoDS_Shell]):
 
     @classmethod
     def make_loft(
-        cls, objs: Iterable[Union[Vertex, Wire]], ruled: bool = False
+        cls, objs: Iterable[Vertex | Wire], ruled: bool = False
     ) -> Shell:
         """make loft
 

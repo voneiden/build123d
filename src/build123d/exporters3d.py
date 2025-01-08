@@ -156,7 +156,7 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
 
 def export_brep(
     to_export: Shape,
-    file_path: Union[PathLike, str, bytes, BytesIO],
+    file_path: PathLike | str | bytes | BytesIO,
 ) -> bool:
     """Export this shape to a BREP file
 
@@ -177,7 +177,7 @@ def export_brep(
 
 def export_gltf(
     to_export: Shape,
-    file_path: Union[PathLike, str, bytes],
+    file_path: PathLike | str | bytes,
     unit: Unit = Unit.MM,
     binary: bool = False,
     linear_deflection: float = 0.001,
@@ -255,7 +255,7 @@ def export_gltf(
 
 def export_step(
     to_export: Shape,
-    file_path: Union[PathLike, str, bytes],
+    file_path: PathLike | str | bytes,
     unit: Unit = Unit.MM,
     write_pcurves: bool = True,
     precision_mode: PrecisionMode = PrecisionMode.AVERAGE,
@@ -323,7 +323,7 @@ def export_step(
 
 def export_stl(
     to_export: Shape,
-    file_path: Union[PathLike, str, bytes],
+    file_path: PathLike | str | bytes,
     tolerance: float = 1e-3,
     angular_tolerance: float = 0.1,
     ascii_format: bool = False,

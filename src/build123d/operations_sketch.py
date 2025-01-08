@@ -28,7 +28,9 @@ license:
 """
 
 from __future__ import annotations
-from typing import Iterable, Union
+from typing import Union
+
+from collections.abc import Iterable
 from build123d.build_enums import Mode, SortBy
 from build123d.topology import (
     Compound,
@@ -193,7 +195,7 @@ def full_round(
 
 
 def make_face(
-    edges: Union[Edge, Iterable[Edge]] = None, mode: Mode = Mode.ADD
+    edges: Edge | Iterable[Edge] = None, mode: Mode = Mode.ADD
 ) -> Sketch:
     """Sketch Operation: make_face
 
@@ -228,7 +230,7 @@ def make_face(
 
 
 def make_hull(
-    edges: Union[Edge, Iterable[Edge]] = None, mode: Mode = Mode.ADD
+    edges: Edge | Iterable[Edge] = None, mode: Mode = Mode.ADD
 ) -> Sketch:
     """Sketch Operation: make_hull
 
@@ -266,7 +268,7 @@ def make_hull(
 
 
 def trace(
-    lines: Union[Curve, Edge, Wire, Iterable[Union[Curve, Edge, Wire]]] = None,
+    lines: Curve | Edge | Wire | Iterable[Curve | Edge | Wire] = None,
     line_width: float = 1,
     mode: Mode = Mode.ADD,
 ) -> Sketch:

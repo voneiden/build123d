@@ -89,7 +89,9 @@ import sys
 import uuid
 import warnings
 from os import PathLike, fsdecode
-from typing import Iterable, Union
+from typing import Union
+
+from collections.abc import Iterable
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
@@ -214,7 +216,7 @@ class Mesher:
         name space `build123d`, name equal to the base file name and the type
         as `python`"""
         caller_file = sys._getframe().f_back.f_code.co_filename
-        with open(caller_file, mode="r", encoding="utf-8") as code_file:
+        with open(caller_file, encoding="utf-8") as code_file:
             source_code = code_file.read()  # read whole file to a string
 
         self.add_meta_data(
@@ -354,7 +356,7 @@ class Mesher:
 
     def add_shape(
         self,
-        shape: Union[Shape, Iterable[Shape]],
+        shape: Shape | Iterable[Shape],
         linear_deflection: float = 0.001,
         angular_deflection: float = 0.1,
         mesh_type: MeshType = MeshType.MODEL,
@@ -483,7 +485,7 @@ class Mesher:
 
         return shape_obj
 
-    def read(self, file_name: Union[PathLike, str, bytes]) -> list[Shape]:
+    def read(self, file_name: PathLike | str | bytes) -> list[Shape]:
         """read
 
         Args:
@@ -527,7 +529,7 @@ class Mesher:
 
         return shapes
 
-    def write(self, file_name: Union[PathLike, str, bytes]):
+    def write(self, file_name: PathLike | str | bytes):
         """write
 
         Args:

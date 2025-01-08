@@ -53,11 +53,8 @@ from abc import ABC, abstractmethod
 from typing import (
     cast as tcast,
     Any,
-    Callable,
     Dict,
     Generic,
-    Iterable,
-    Iterator,
     Optional,
     Protocol,
     SupportsIndex,
@@ -68,6 +65,8 @@ from typing import (
     overload,
     TYPE_CHECKING,
 )
+
+from collections.abc import Callable, Iterable, Iterator
 
 import OCP.GeomAbs as ga
 import OCP.TopAbs as ta
@@ -153,7 +152,9 @@ from build123d.geometry import (
     VectorLike,
     logger,
 )
-from typing_extensions import Self, Literal
+from typing_extensions import Self
+
+from typing import Literal
 from vtkmodules.vtkCommonDataModel import vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkPolyDataNormals, vtkTriangleFilter
 
@@ -226,7 +227,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         ta.TopAbs_COMPSOLID: TopoDS.CompSolid_s,
     }
 
-    geom_LUT_EDGE: Dict[ga.GeomAbs_CurveType, GeomType] = {
+    geom_LUT_EDGE: dict[ga.GeomAbs_CurveType, GeomType] = {
         ga.GeomAbs_Line: GeomType.LINE,
         ga.GeomAbs_Circle: GeomType.CIRCLE,
         ga.GeomAbs_Ellipse: GeomType.ELLIPSE,
@@ -237,7 +238,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         ga.GeomAbs_OffsetCurve: GeomType.OFFSET,
         ga.GeomAbs_OtherCurve: GeomType.OTHER,
     }
-    geom_LUT_FACE: Dict[ga.GeomAbs_SurfaceType, GeomType] = {
+    geom_LUT_FACE: dict[ga.GeomAbs_SurfaceType, GeomType] = {
         ga.GeomAbs_Plane: GeomType.PLANE,
         ga.GeomAbs_Cylinder: GeomType.CYLINDER,
         ga.GeomAbs_Cone: GeomType.CONE,
@@ -484,7 +485,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     @classmethod
     @abstractmethod
-    def cast(cls: Type[Self], obj: TopoDS_Shape) -> Self:
+    def cast(cls: type[Self], obj: TopoDS_Shape) -> Self:
         """Returns the right type of wrapper, given a OCCT object"""
 
     @classmethod
@@ -1742,7 +1743,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
 
     def tessellate(
         self, tolerance: float, angular_tolerance: float = 0.1
-    ) -> Tuple[list[Vector], list[Tuple[int, int, int]]]:
+    ) -> tuple[list[Vector], list[tuple[int, int, int]]]:
         """General triangulated approximation"""
         if self.wrapped is None:
             raise ValueError("Cannot tessellate an empty shape")
@@ -1750,7 +1751,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         self.mesh(tolerance, angular_tolerance)
 
         vertices: list[Vector] = []
-        triangles: list[Tuple[int, int, int]] = []
+        triangles: list[tuple[int, int, int]] = []
         offset = 0
 
         for face in self.faces():

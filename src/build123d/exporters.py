@@ -36,7 +36,9 @@ from copy import copy
 from enum import Enum, auto
 from os import PathLike, fsdecode, fspath
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
+
+from collections.abc import Callable, Iterable
 
 import ezdxf
 import svgpathtools as PT
@@ -84,7 +86,7 @@ class Drawing:
         look_from: VectorLike = (1, -1, 1),
         look_up: VectorLike = (0, 0, 1),
         with_hidden: bool = True,
-        focus: Union[float, None] = None,
+        focus: float | None = None,
     ):
         # pylint: disable=too-many-locals
         hlr = HLRBRep_Algo()
@@ -506,9 +508,9 @@ class ExportDXF(Export2D):
         self,
         version: str = ezdxf.DXF2013,
         unit: Unit = Unit.MM,
-        color: Optional[ColorIndex] = None,
-        line_weight: Optional[float] = None,
-        line_type: Optional[LineType] = None,
+        color: ColorIndex | None = None,
+        line_weight: float | None = None,
+        line_type: LineType | None = None,
     ):
         self._non_planar_point_count = 0
         if unit not in self._UNITS_LOOKUP:
@@ -538,9 +540,9 @@ class ExportDXF(Export2D):
         self,
         name: str,
         *,
-        color: Optional[ColorIndex] = None,
-        line_weight: Optional[float] = None,
-        line_type: Optional[LineType] = None,
+        color: ColorIndex | None = None,
+        line_weight: float | None = None,
+        line_type: LineType | None = None,
     ) -> Self:
         """add_layer
 
@@ -597,7 +599,7 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def add_shape(self, shape: Union[Shape, Iterable[Shape]], layer: str = "") -> Self:
+    def add_shape(self, shape: Shape | Iterable[Shape], layer: str = "") -> Self:
         """add_shape
 
         Adds a shape to the specified layer.
@@ -633,7 +635,7 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def write(self, file_name: Union[PathLike, str, bytes]):
+    def write(self, file_name: PathLike | str | bytes):
         """write
 
         Writes the DXF data to the specified file name.
@@ -651,7 +653,7 @@ class ExportDXF(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _convert_point(self, pt: Union[gp_XYZ, gp_Pnt, gp_Vec, Vector]) -> Vec2:
+    def _convert_point(self, pt: gp_XYZ | gp_Pnt | gp_Vec | Vector) -> Vec2:
         """Create a Vec2 from a gp_Pnt or Vector.
         This method also checks for points z != 0."""
         if isinstance(pt, (gp_XYZ, gp_Pnt, gp_Vec)):
@@ -870,14 +872,14 @@ class ExportSVG(Export2D):
         def __init__(
             self,
             name: str,
-            fill_color: Union[ColorIndex, RGB, Color, None],
-            line_color: Union[ColorIndex, RGB, Color, None],
+            fill_color: ColorIndex | RGB | Color | None,
+            line_color: ColorIndex | RGB | Color | None,
             line_weight: float,
             line_type: LineType,
         ):
             def convert_color(
-                c: Union[ColorIndex, RGB, Color, None],
-            ) -> Union[Color, None]:
+                c: ColorIndex | RGB | Color | None,
+            ) -> Color | None:
                 if isinstance(c, ColorIndex):
                     # The easydxf color indices BLACK and WHITE have the same
                     # value (7), and are both mapped to (255,255,255) by the
@@ -908,11 +910,11 @@ class ExportSVG(Export2D):
         margin: float = 0,
         fit_to_stroke: bool = True,
         precision: int = 6,
-        fill_color: Union[ColorIndex, RGB, Color, None] = None,
-        line_color: Union[ColorIndex, RGB, Color, None] = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: ColorIndex | RGB | Color | None = None,
+        line_color: ColorIndex | RGB | Color | None = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
-        dot_length: Union[DotLength, float] = DotLength.INKSCAPE_COMPAT,
+        dot_length: DotLength | float = DotLength.INKSCAPE_COMPAT,
     ):
         if unit not in ExportSVG._UNIT_STRING:
             raise ValueError(
@@ -944,8 +946,8 @@ class ExportSVG(Export2D):
         self,
         name: str,
         *,
-        fill_color: Union[ColorIndex, RGB, Color, None] = None,
-        line_color: Union[ColorIndex, RGB, Color, None] = Export2D.DEFAULT_COLOR_INDEX,
+        fill_color: ColorIndex | RGB | Color | None = None,
+        line_color: ColorIndex | RGB | Color | None = Export2D.DEFAULT_COLOR_INDEX,
         line_weight: float = Export2D.DEFAULT_LINE_WEIGHT,  # in millimeters
         line_type: LineType = Export2D.DEFAULT_LINE_TYPE,
     ) -> Self:
@@ -991,7 +993,7 @@ class ExportSVG(Export2D):
 
     def add_shape(
         self,
-        shape: Union[Shape, Iterable[Shape]],
+        shape: Shape | Iterable[Shape],
         layer: str = "",
         reverse_wires: bool = False,
     ):
@@ -1097,7 +1099,7 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     @staticmethod
-    def _wire_edges(wire: Wire, reverse: bool) -> List[Edge]:
+    def _wire_edges(wire: Wire, reverse: bool) -> list[Edge]:
         # edges = []
         # explorer = BRepTools_WireExplorer(wire.wrapped)
         # while explorer.More():
@@ -1136,7 +1138,7 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def _path_point(self, pt: Union[gp_Pnt, Vector]) -> complex:
+    def _path_point(self, pt: gp_Pnt | Vector) -> complex:
         """Create a complex point from a gp_Pnt or Vector.
         We are using complex because that is what svgpathtools wants.
         This method also checks for points z != 0."""
@@ -1390,7 +1392,7 @@ class ExportSVG(Export2D):
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     def _group_for_layer(self, layer: _Layer, attribs: dict = None) -> ET.Element:
-        def _color_attribs(c: Color) -> Tuple[str, str]:
+        def _color_attribs(c: Color) -> tuple[str, str]:
             if c:
                 (r, g, b, a) = tuple(c)
                 (r, g, b, a) = (int(r * 255), int(g * 255), int(b * 255), round(a, 3))
@@ -1427,7 +1429,7 @@ class ExportSVG(Export2D):
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-    def write(self, path: Union[PathLike, str, bytes]):
+    def write(self, path: PathLike | str | bytes):
         """write
 
         Writes the SVG data to the specified file path.

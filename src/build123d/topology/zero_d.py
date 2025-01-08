@@ -54,7 +54,9 @@ license:
 from __future__ import annotations
 
 import itertools
-from typing import Iterable, overload, TYPE_CHECKING
+from typing import overload, TYPE_CHECKING
+
+from collections.abc import Iterable
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool

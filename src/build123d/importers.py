@@ -93,7 +93,7 @@ topods_lut = {
 }
 
 
-def import_brep(file_name: Union[PathLike, str, bytes]) -> Shape:
+def import_brep(file_name: PathLike | str | bytes) -> Shape:
     """Import shape from a BREP file
 
     Args:
@@ -116,7 +116,7 @@ def import_brep(file_name: Union[PathLike, str, bytes]) -> Shape:
     return Compound.cast(shape)
 
 
-def import_step(filename: Union[PathLike, str, bytes]) -> Compound:
+def import_step(filename: PathLike | str | bytes) -> Compound:
     """import_step
 
     Extract shapes from a STEP file and return them as a Compound object.
@@ -173,7 +173,7 @@ def import_step(filename: Union[PathLike, str, bytes]) -> Compound:
 
         return shape_color
 
-    def build_assembly(parent_tdf_label: Optional[TDF_Label] = None) -> list[Shape]:
+    def build_assembly(parent_tdf_label: TDF_Label | None = None) -> list[Shape]:
         """Recursively extract object into an assembly"""
         sub_tdf_labels = TDF_LabelSequence()
         if parent_tdf_label is None:
@@ -228,7 +228,7 @@ def import_step(filename: Union[PathLike, str, bytes]) -> Compound:
     return root
 
 
-def import_stl(file_name: Union[PathLike, str, bytes]) -> Face:
+def import_stl(file_name: PathLike | str | bytes) -> Face:
     """import_stl
 
     Extract shape from an STL file and return it as a Face reference object.
@@ -255,7 +255,7 @@ def import_stl(file_name: Union[PathLike, str, bytes]) -> Face:
 
 
 def import_svg_as_buildline_code(
-    file_name: Union[PathLike, str, bytes],
+    file_name: PathLike | str | bytes,
 ) -> tuple[str, str]:
     """translate_to_buildline_code
 
@@ -332,13 +332,13 @@ def import_svg_as_buildline_code(
 
 
 def import_svg(
-    svg_file: Union[str, Path, TextIO],
+    svg_file: str | Path | TextIO,
     *,
     flip_y: bool = True,
     ignore_visibility: bool = False,
     label_by: str = "id",
     is_inkscape_label: bool = False,
-) -> ShapeList[Union[Wire, Face]]:
+) -> ShapeList[Wire | Face]:
     """import_svg
 
     Args:

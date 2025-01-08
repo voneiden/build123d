@@ -1,4 +1,3 @@
-
 """
 build123d.topology package
 
