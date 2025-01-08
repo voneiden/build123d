@@ -1,0 +1,725 @@
+src/build123d/_dev/scm_version.py:0: error: Cannot find implementation or library stub for module named "setuptools_scm"  [import-not-found]
+src/build123d/_dev/scm_version.py:0: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#missing-imports
+src/build123d/version.py:0: error: Cannot find implementation or library stub for module named "build123d._version"  [import-not-found]
+src/build123d/version.py:0: error: Name "version" already defined (possibly by an import)  [no-redef]
+src/build123d/jupyter_tools.py:0: error: Cannot find implementation or library stub for module named "IPython.display"  [import-not-found]
+src/build123d/geometry.py:0: error: Incompatible default for argument "normal" (default has type "None", argument has type "Vector")  [assignment]
+src/build123d/geometry.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/geometry.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/geometry.py:0: error: Self argument missing for a non-static method (or an invalid type for self)  [misc]
+src/build123d/geometry.py:0: error: Name "Shape" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Name "Edge" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Cannot determine type of "wrapped"  [has-type]
+src/build123d/geometry.py:0: error: Self argument missing for a non-static method (or an invalid type for self)  [misc]
+src/build123d/geometry.py:0: error: Name "Shape" is not defined  [name-defined]
+src/build123d/geometry.py:0: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/build123d/geometry.py:0: error: Attribute "wrapped" already defined on line 0  [no-redef]
+src/build123d/geometry.py:0: error: Incompatible default for argument "tol" (default has type "None", argument has type "float")  [assignment]
+src/build123d/geometry.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/geometry.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/geometry.py:0: error: Incompatible default for argument "tolerance" (default has type "None", argument has type "float")  [assignment]
+src/build123d/geometry.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/geometry.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/geometry.py:0: error: Cannot determine type of "wrapped"  [has-type]
+src/build123d/geometry.py:0: error: Incompatible default for argument "rotation" (default has type "None", argument has type "tuple[float, float, float] | Rotation")  [assignment]
+src/build123d/geometry.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/geometry.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/geometry.py:0: error: Name "Shape" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Item "Location" of the upper bound "Location | Any" of type variable "T" has no attribute "moved"  [union-attr]
+src/build123d/geometry.py:0: error: Self argument missing for a non-static method (or an invalid type for self)  [misc]
+src/build123d/geometry.py:0: error: Name "Shape" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Incompatible return value type (got "tuple[tuple[Any, Any, Any], tuple[float, ...]]", expected "tuple[tuple[float, float, float], tuple[float, float, float]]")  [return-value]
+src/build123d/geometry.py:0: error: Invalid type comment or annotation  [valid-type]
+src/build123d/geometry.py:0: error: Overloaded function signature 3 will never be matched: signature 2's parameter type(s) are the same or broader  [overload-cannot-match]
+src/build123d/geometry.py:0: error: Name "Face" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Incompatible default for argument "x_dir" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/geometry.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/geometry.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/geometry.py:0: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/build123d/geometry.py:0: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/build123d/geometry.py:0: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/build123d/geometry.py:0: error: Name "Shape" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Name "Shape" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "Plane")  [assignment]
+src/build123d/geometry.py:0: error: Name "Shape" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Name "Vertex" is not defined  [name-defined]
+src/build123d/geometry.py:0: error: Argument 1 to "tuple" has incompatible type "Axis | Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Any"; expected "Iterable[Any]"  [arg-type]
+src/build123d/geometry.py:0: error: Incompatible types in assignment (expression has type "Vector", variable has type "tuple[Any, ...]")  [assignment]
+src/build123d/geometry.py:0: error: Incompatible types in assignment (expression has type "Axis | Vector | None", variable has type "tuple[Any, ...]")  [assignment]
+src/build123d/geometry.py:0: error: Incompatible default for argument "ordering" (default has type "None", argument has type "Extrinsic | Intrinsic")  [assignment]
+src/build123d/geometry.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/geometry.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/geometry.py:0: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/build123d/geometry.py:0: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/build123d/geometry.py:0: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/build123d/geometry.py:0: error: Incompatible types in assignment (expression has type "BoundBox", variable has type "Vector")  [assignment]
+src/build123d/geometry.py:0: error: Item "Sequence[float]" of "Any | Sequence[float]" has no attribute "transform_shape"  [union-attr]
+src/build123d/geometry.py:0: error: Name "Shape" is not defined  [name-defined]
+src/build123d/topology/shape_core.py:0: error: Incompatible return value type (got "Any | None", expected "Shape[Any]")  [return-value]
+src/build123d/persistence.py:0: error: Incompatible return value type (got "None", expected "bytes")  [return-value]
+src/build123d/persistence.py:0: error: Incompatible return value type (got "None", expected "bytes")  [return-value]
+src/build123d/mesher.py:0: error: Cannot find implementation or library stub for module named "py_lib3mf"  [import-not-found]
+src/build123d/mesher.py:0: error: Item "None" of "Any | None" has no attribute "Orientation"  [union-attr]
+src/build123d/mesher.py:0: error: "list" expects 1 type argument, but 3 given  [type-arg]
+src/build123d/mesher.py:0: error: Incompatible types in assignment (expression has type "Array[c_uint]", variable has type "Array[c_float]")  [assignment]
+src/build123d/mesher.py:0: error: Incompatible default for argument "part_number" (default has type "None", argument has type "str")  [assignment]
+src/build123d/mesher.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/mesher.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/mesher.py:0: error: Module "uuid" is not valid as a type  [valid-type]
+src/build123d/mesher.py:0: note: Perhaps you meant to use a protocol matching the module structure?
+src/build123d/mesher.py:0: error: Attribute "meshes" already defined on line 0  [no-redef]
+src/build123d/importers.py:0: error: Cannot find implementation or library stub for module named "ocpsvg"  [import-not-found]
+src/build123d/importers.py:0: error: If x = b'abc' then f"{x}" or "{}".format(x) produces "b'abc'", not "abc". If this is desired behavior, use f"{x!r}" or "{!r}".format(x). Otherwise, decode the bytes  [str-bytes-safe]
+src/build123d/importers.py:0: error: Incompatible types in assignment (expression has type "None", variable has type "bool")  [assignment]
+src/build123d/build_common.py:0: error: Item "None" of "FrameType | None" has no attribute "f_code"  [union-attr]
+src/build123d/build_common.py:0: error: Incompatible default for argument "face_plane" (default has type "None", argument has type "Plane")  [assignment]
+src/build123d/build_common.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/build_common.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/build_common.py:0: error: Incompatible default for argument "caller" (default has type "None", argument has type "Builder | str")  [assignment]
+src/build123d/build_common.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/build_common.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/build_common.py:0: error: Incompatible return value type (got "Builder | None", expected "Self")  [return-value]
+src/build123d/build_common.py:0: error: Argument 1 to "_shapes" of "Builder" has incompatible type "type"; expected "Vertex | Edge | Face | Solid"  [arg-type]
+src/build123d/build_common.py:0: error: Invalid index type "None" for "dict[type, list[Edge | Wire | Face | Solid | Compound]]"; expected type "type"  [index]
+src/build123d/build_common.py:0: error: Invalid index type "None" for "dict[type, list[Edge | Wire | Face | Solid | Compound]]"; expected type "type"  [index]
+src/build123d/build_common.py:0: error: Invalid index type "None" for "dict[type, list[Edge | Wire | Face | Solid | Compound]]"; expected type "type"  [index]
+src/build123d/build_common.py:0: error: Invalid index type "None" for "dict[type, list[Edge | Wire | Face | Solid | Compound]]"; expected type "type"  [index]
+src/build123d/build_common.py:0: error: Incompatible types in assignment (expression has type "Shape[Any] | ShapeList[Shape[Any]] | None", variable has type "Shape[Any] | ShapeList[Shape[Any]]")  [assignment]
+src/build123d/build_common.py:0: error: Invalid index type "None" for "dict[type, list[Edge | Wire | Face | Solid | Compound]]"; expected type "type"  [index]
+src/build123d/build_common.py:0: error: "None" not callable  [misc]
+src/build123d/build_common.py:0: error: Property "_obj" defined in "Builder" is read-only  [misc]
+src/build123d/build_common.py:0: error: "None" not callable  [misc]
+src/build123d/build_common.py:0: error: Property "_obj" defined in "Builder" is read-only  [misc]
+src/build123d/build_common.py:0: error: Invalid index type "None" for "dict[type, list[Edge | Wire | Face | Solid | Compound]]"; expected type "type"  [index]
+src/build123d/build_common.py:0: error: Argument 1 to "_shapes" of "Builder" has incompatible type "type"; expected "Vertex | Edge | Face | Solid"  [arg-type]
+src/build123d/build_common.py:0: error: Property "_obj" defined in "Builder" is read-only  [misc]
+src/build123d/build_common.py:0: error: "None" not callable  [misc]
+src/build123d/build_common.py:0: error: Property "_obj" defined in "Builder" is read-only  [misc]
+src/build123d/build_common.py:0: error: "None" not callable  [misc]
+src/build123d/build_common.py:0: error: Incompatible default for argument "obj_type" (default has type "None", argument has type "Vertex | Edge | Face | Solid")  [assignment]
+src/build123d/build_common.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/build_common.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/build_common.py:0: error: Incompatible default for argument "objects" (default has type "None", argument has type "Shape[Any] | Iterable[Shape[Any]]")  [assignment]
+src/build123d/build_common.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/build_common.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/build_common.py:0: error: Missing return statement  [return]
+src/build123d/build_common.py:0: error: Missing return statement  [return]
+src/build123d/build_common.py:0: error: Missing return statement  [return]
+src/build123d/build_common.py:0: error: Incompatible default for argument "objects" (default has type "None", argument has type "Iterable[Shape[Any]]")  [assignment]
+src/build123d/build_common.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/build_common.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/build_common.py:0: error: Incompatible types in assignment (expression has type "float", variable has type "int")  [assignment]
+src/build123d/build_common.py:0: error: "Iterable" expects 1 type argument, but 6 given  [type-arg]
+src/build123d/build_common.py:0: error: Argument 1 to "append" of "list" has incompatible type "Any | Vector | Sequence[float]"; expected "Vector"  [arg-type]
+src/build123d/build_common.py:0: error: Argument 1 to "extend" of "list" has incompatible type "list[Any | Vector | Sequence[float]]"; expected "Iterable[Vector]"  [arg-type]
+src/build123d/build_common.py:0: error: Incompatible types in assignment (expression has type "list[Vector]", variable has type "Vector")  [assignment]
+src/build123d/build_common.py:0: error: Too few arguments  [call-arg]
+src/build123d/build_common.py:0: error: Argument 2 has incompatible type "Select"; expected "P.args"  [arg-type]
+src/build123d/build_common.py:0: error: Incompatible return value type (got "_Wrapped[[Builder, **P], T2, [Select], Any]", expected "Callable[P, T2]")  [return-value]
+src/build123d/build_common.py:0: note: "_Wrapped[[Builder, **P], T2, [Select], Any].__call__" has type "Callable[[DefaultArg(Select, 'select')], Any]"
+src/build123d/exporters3d.py:0: error: Unsupported left operand type for * ("None")  [operator]
+src/build123d/exporters3d.py:0: note: Left operand is of type "Location | None"
+src/build123d/exporters.py:0: error: Cannot find implementation or library stub for module named "ezdxf"  [import-not-found]
+src/build123d/exporters.py:0: error: Cannot find implementation or library stub for module named "ezdxf.colors"  [import-not-found]
+src/build123d/exporters.py:0: error: Cannot find implementation or library stub for module named "ezdxf.math"  [import-not-found]
+src/build123d/exporters.py:0: error: Incompatible default for argument "look_at" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/exporters.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/exporters.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/exporters.py:0: error: Incompatible types in assignment (expression has type "int", target has type "str")  [assignment]
+src/build123d/exporters.py:0: error: Incompatible types in assignment (expression has type "int", target has type "str")  [assignment]
+src/build123d/exporters.py:0: error: "None" object is not iterable  [misc]
+src/build123d/exporters.py:0: error: Item "None" of "Location | None" has no attribute "wrapped"  [union-attr]
+src/build123d/exporters.py:0: error: No overload variant of "Color" matches argument types "Any", "int"  [call-overload]
+src/build123d/exporters.py:0: note: Possible overload variants:
+src/build123d/exporters.py:0: note: def __init__(self, q_color: Any) -> Color
+src/build123d/exporters.py:0: note: def __init__(self, name: str, alpha: float = ...) -> Color
+src/build123d/exporters.py:0: note: def __init__(self, red: float, green: float, blue: float, alpha: float = ...) -> Color
+src/build123d/exporters.py:0: note: def __init__(self, color_tuple: tuple[float]) -> Color
+src/build123d/exporters.py:0: note: def __init__(self, color_code: int, alpha: int = ...) -> Color
+src/build123d/exporters.py:0: error: Incompatible types in assignment (expression has type "None", variable has type "BoundBox")  [assignment]
+src/build123d/exporters.py:0: error: Incompatible types in assignment (expression has type "_Layer", variable has type "str")  [assignment]
+src/build123d/exporters.py:0: error: Argument 2 to "_add_single_shape" of "ExportSVG" has incompatible type "str"; expected "_Layer"  [arg-type]
+src/build123d/exporters.py:0: error: Argument 2 to "_add_single_shape" of "ExportSVG" has incompatible type "str"; expected "_Layer"  [arg-type]
+src/build123d/exporters.py:0: error: Item "None" of "Location | None" has no attribute "wrapped"  [union-attr]
+src/build123d/exporters.py:0: error: Item "None" of "Any | None" has no attribute "Orientation"  [union-attr]
+src/build123d/exporters.py:0: error: Incompatible default for argument "attribs" (default has type "None", argument has type "dict[Any, Any]")  [assignment]
+src/build123d/exporters.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/exporters.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/exporters.py:0: error: Incompatible return value type (got "tuple[str, str | None]", expected "tuple[str, str]")  [return-value]
+src/build123d/exporters.py:0: error: Incompatible return value type (got "tuple[str, None]", expected "tuple[str, str]")  [return-value]
+src/build123d/exporters.py:0: error: Argument 1 to "_color_attribs" has incompatible type "Color | None"; expected "Color"  [arg-type]
+src/build123d/exporters.py:0: error: Argument 1 to "_color_attribs" has incompatible type "Color | None"; expected "Color"  [arg-type]
+src/build123d/exporters.py:0: error: Argument "default_namespace" to "write" of "ElementTree" has incompatible type "bool"; expected "str | None"  [arg-type]
+src/build123d/build_sketch.py:0: error: Incompatible types in assignment (expression has type "type[Face]", base class "Builder" defined the type as "None")  [assignment]
+src/build123d/build_sketch.py:0: error: Incompatible types in assignment (expression has type "type[Compound]", base class "Builder" defined the type as "None")  [assignment]
+src/build123d/build_sketch.py:0: error: Attribute "sketch_local" already defined on line 0  [no-redef]
+src/build123d/build_sketch.py:0: error: Incompatible types in assignment (expression has type "None", variable has type "Sketch")  [assignment]
+src/build123d/build_sketch.py:0: error: Incompatible default for argument "face_plane" (default has type "None", argument has type "Plane")  [assignment]
+src/build123d/build_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/build_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/build_part.py:0: error: Incompatible types in assignment (expression has type "type[Solid]", base class "Builder" defined the type as "None")  [assignment]
+src/build123d/build_part.py:0: error: Incompatible types in assignment (expression has type "type[Compound]", base class "Builder" defined the type as "None")  [assignment]
+src/build123d/build_part.py:0: error: Incompatible return value type (got "Location | None", expected "Location")  [return-value]
+src/build123d/build_part.py:0: error: Attribute "part" already defined on line 0  [no-redef]
+src/build123d/build_part.py:0: error: Incompatible types in assignment (expression has type "None", variable has type "Part")  [assignment]
+src/build123d/build_part.py:0: error: Incompatible default for argument "face_plane" (default has type "None", argument has type "Plane")  [assignment]
+src/build123d/build_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/build_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/build_line.py:0: error: Incompatible types in assignment (expression has type "type[Edge]", base class "Builder" defined the type as "None")  [assignment]
+src/build123d/build_line.py:0: error: Incompatible types in assignment (expression has type "type[Compound]", base class "Builder" defined the type as "None")  [assignment]
+src/build123d/build_line.py:0: error: Attribute "line" already defined on line 0  [no-redef]
+src/build123d/build_line.py:0: error: Incompatible types in assignment (expression has type "None", variable has type "Curve")  [assignment]
+src/build123d/build_line.py:0: error: Incompatible default for argument "face_plane" (default has type "None", argument has type "Plane")  [assignment]
+src/build123d/build_line.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/build_line.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_sketch.py:0: error: Incompatible types in assignment (expression has type "tuple[float, int]", target has type "tuple[float, None]")  [assignment]
+src/build123d/operations_sketch.py:0: error: No overload variant of "__getitem__" of "list" matches argument type "None"  [call-overload]
+src/build123d/operations_sketch.py:0: note: Possible overload variants:
+src/build123d/operations_sketch.py:0: note: def __getitem__(self, SupportsIndex, /) -> Vector
+src/build123d/operations_sketch.py:0: note: def __getitem__(self, slice[Any, Any, Any], /) -> list[Vector]
+src/build123d/operations_sketch.py:0: error: Argument 1 to "distance_to_with_closest_points" of "Shape" has incompatible type "float"; expected "Shape[Any] | Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/operations_sketch.py:0: error: Argument 1 to "distance_to_with_closest_points" of "Shape" has incompatible type "float"; expected "Shape[Any] | Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/operations_sketch.py:0: error: Incompatible types in assignment (expression has type "float", variable has type "Vector")  [assignment]
+src/build123d/operations_sketch.py:0: error: Unsupported operand types for - ("float" and "Vector")  [operator]
+src/build123d/operations_sketch.py:0: error: Item "None" of "Shape[Any] | None" has no attribute "edges"  [union-attr]
+src/build123d/operations_sketch.py:0: error: Unsupported operand types for - ("ShapeList[Edge]" and "list[Edge]")  [operator]
+src/build123d/operations_sketch.py:0: note: Left operand is of type "ShapeList[Edge] | Any"
+src/build123d/operations_sketch.py:0: error: Incompatible default for argument "edges" (default has type "None", argument has type "Edge | Iterable[Edge]")  [assignment]
+src/build123d/operations_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_sketch.py:0: error: Incompatible default for argument "edges" (default has type "None", argument has type "Edge | Iterable[Edge]")  [assignment]
+src/build123d/operations_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_sketch.py:0: error: Incompatible default for argument "lines" (default has type "None", argument has type "Curve | Edge | Wire | Iterable[Curve | Edge | Wire]")  [assignment]
+src/build123d/operations_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_sketch.py:0: error: Need type annotation for "new_faces" (hint: "new_faces: list[<type>] = ...")  [var-annotated]
+src/build123d/operations_part.py:0: error: Incompatible default for argument "to_extrude" (default has type "None", argument has type "Face | Sketch")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Incompatible default for argument "amount" (default has type "None", argument has type "float")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Incompatible default for argument "dir" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Incompatible default for argument "until" (default has type "None", argument has type "Until")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Incompatible default for argument "target" (default has type "None", argument has type "Compound | Solid")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Incompatible default for argument "sections" (default has type "None", argument has type "Face | Sketch | Iterable[Vertex | Face | Sketch]")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Item "None" of "Face | None" has no attribute "outer_wire"  [union-attr]
+src/build123d/operations_part.py:0: error: Unsupported operand types for + ("ShapeList[Face]" and "list[Any]")  [operator]
+src/build123d/operations_part.py:0: error: Incompatible default for argument "line" (default has type "None", argument has type "Edge | Wire | Curve")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Need type annotation for "station_edges"  [var-annotated]
+src/build123d/operations_part.py:0: error: Argument 1 to "len" has incompatible type "list[float | int] | Iterable[float]"; expected "Sized"  [arg-type]
+src/build123d/operations_part.py:0: error: Argument 1 to "_add_to_context" of "Builder" has incompatible type "Solid | ShapeList[Solid]"; expected "Edge | Wire | Face | Solid | Compound"  [arg-type]
+src/build123d/operations_part.py:0: error: Incompatible default for argument "profiles" (default has type "None", argument has type "Face | Iterable[Face]")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Incompatible default for argument "obj" (default has type "None", argument has type "Part")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Argument 3 to "validate_inputs" has incompatible type "None"; expected "Iterable[Shape[Any]]"  [arg-type]
+src/build123d/operations_part.py:0: error: Argument 1 to "_add_to_context" of "Builder" has incompatible type "*list[Part | ShapeList[Part] | None]"; expected "Edge | Wire | Face | Solid | Compound"  [arg-type]
+src/build123d/operations_part.py:0: error: Incompatible default for argument "to_thicken" (default has type "None", argument has type "Face | Sketch")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Incompatible default for argument "amount" (default has type "None", argument has type "float")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Incompatible default for argument "normal_override" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/operations_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_part.py:0: error: Unsupported operand types for * ("Sequence[float]" and "int")  [operator]
+src/build123d/operations_part.py:0: note: Left operand is of type "Vector | Sequence[float]"
+src/build123d/operations_part.py:0: error: Argument "normal_override" to "thicken" of "Solid" has incompatible type "Vector | int"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | None"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Cannot find implementation or library stub for module named "trianglesolver"  [import-not-found]
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "align" (default has type "None", argument has type "Align | tuple[Align, Align]")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Incompatible types in assignment (expression has type "tuple[Any, ...] | None", variable has type "Align | tuple[Align, Align]")  [assignment]
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]")  [assignment]
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Incompatible types in assignment (expression has type "list[Vector]", variable has type "ShapeList[Vector]")  [assignment]
+src/build123d/objects_sketch.py:0: error: Argument "align" to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Incompatible types in assignment (expression has type "Face | None", variable has type "Face")  [assignment]
+src/build123d/objects_sketch.py:0: error: The return type of "__init__" must be None  [misc]
+src/build123d/objects_sketch.py:0: error: Missing return statement  [return]
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "font_path" (default has type "None", argument has type "str")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "path" (default has type "None", argument has type "Edge | Wire")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Argument "align" to "make_text" of "Compound" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "right_side_angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Argument 3 to "__init__" of "BaseSketchObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "a" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "b" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "c" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "A" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "B" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Incompatible default for argument "C" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_sketch.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_sketch.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_sketch.py:0: error: Generator has incompatible item type "Vector"; expected "bool"  [misc]
+src/build123d/objects_sketch.py:0: error: Argument "align" to "__init__" of "BaseSketchObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/objects_part.py:0: error: Incompatible default for argument "align" (default has type "None", argument has type "Align | tuple[Align, Align, Align]")  [assignment]
+src/build123d/objects_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_part.py:0: error: Incompatible types in assignment (expression has type "tuple[Any, ...] | None", variable has type "Align | tuple[Align, Align, Align]")  [assignment]
+src/build123d/objects_part.py:0: error: Argument "align" to "__init__" of "BasePartObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align, Align]"  [arg-type]
+src/build123d/objects_part.py:0: error: Argument "align" to "__init__" of "BasePartObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align, Align]"  [arg-type]
+src/build123d/objects_part.py:0: error: Incompatible default for argument "depth" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_part.py:0: error: Argument "part" to "__init__" of "BasePartObject" has incompatible type "Solid | ShapeList[Solid]"; expected "Part | Solid"  [arg-type]
+src/build123d/objects_part.py:0: error: Incompatible default for argument "depth" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_part.py:0: error: Argument "part" to "__init__" of "BasePartObject" has incompatible type "Solid | ShapeList[Solid]"; expected "Part | Solid"  [arg-type]
+src/build123d/objects_part.py:0: error: Argument "align" to "__init__" of "BasePartObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align, Align]"  [arg-type]
+src/build123d/objects_part.py:0: error: Incompatible default for argument "depth" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_part.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_part.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_part.py:0: error: Argument "align" to "__init__" of "BasePartObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align, Align]"  [arg-type]
+src/build123d/objects_part.py:0: error: Argument "align" to "__init__" of "BasePartObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align, Align]"  [arg-type]
+src/build123d/objects_part.py:0: error: Argument "align" to "__init__" of "BasePartObject" has incompatible type "tuple[Any, ...] | None"; expected "Align | tuple[Align, Align, Align]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Incompatible default for argument "weights" (default has type "None", argument has type "list[float]")  [assignment]
+src/build123d/objects_curve.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_curve.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float], ...]")  [assignment]
+src/build123d/objects_curve.py:0: error: Item "list[Vector]" of "list[Vector] | Vector" has no attribute "normalized"  [union-attr]
+src/build123d/objects_curve.py:0: error: Argument 1 to "make_line" of "Edge" has incompatible type "list[Vector] | Vector"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: No overload variant of "__add__" of "list" matches argument type "Vector"  [operator]
+src/build123d/objects_curve.py:0: note: Possible overload variants:
+src/build123d/objects_curve.py:0: note: def __add__(self, list[Vector], /) -> list[Vector]
+src/build123d/objects_curve.py:0: note: def [_S] __add__(self, list[_S], /) -> list[_S | Vector]
+src/build123d/objects_curve.py:0: note: Both left and right operands are unions
+src/build123d/objects_curve.py:0: error: Argument 1 to "add" of "BoundBox" has incompatible type "list[Vector] | Vector"; expected "tuple[float, float, float] | Vector | BoundBox"  [arg-type]
+src/build123d/objects_curve.py:0: error: The return type of "__init__" must be None  [misc]
+src/build123d/objects_curve.py:0: error: Argument 1 to "Axis" has incompatible type "list[Vector] | Vector"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Argument 4 to "make_helix" of "Edge" has incompatible type "list[Vector] | Vector"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]")  [assignment]
+src/build123d/objects_curve.py:0: error: Argument 1 to "localize" of "WorkplaneList" has incompatible type "*tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Value of type "list[Vector] | Vector" is not indexable  [index]
+src/build123d/objects_curve.py:0: error: Argument 1 to "len" has incompatible type "list[Vector] | Vector"; expected "Sized"  [arg-type]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Vector] | Vector", variable has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/objects_curve.py:0: error: No overload variant of "__add__" of "tuple" matches argument type "Vector"  [operator]
+src/build123d/objects_curve.py:0: note: Possible overload variants:
+src/build123d/objects_curve.py:0: note: def __add__(self, tuple[float, ...], /) -> tuple[float, ...]
+src/build123d/objects_curve.py:0: note: def [_T] __add__(self, tuple[_T, ...], /) -> tuple[float | _T, ...]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for + ("Sequence[float]" and "Vector")  [operator]
+src/build123d/objects_curve.py:0: note: Left operand is of type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("tuple[float, float]")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("tuple[float, float, float]")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("Sequence[float]")  [operator]
+src/build123d/objects_curve.py:0: note: Both left and right operands are unions
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("tuple[float, float]")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("tuple[float, float, float]")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("Sequence[float]")  [operator]
+src/build123d/objects_curve.py:0: note: Both left and right operands are unions
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]")  [assignment]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Vector] | Vector", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]")  [assignment]
+src/build123d/objects_curve.py:0: error: Argument 1 to "localize" of "WorkplaneList" has incompatible type "*tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]]]"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Vector] | Vector", variable has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/objects_curve.py:0: error: Item "list[Vector]" of "list[Vector] | Vector" has no attribute "normalized"  [union-attr]
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("tuple[float, float]")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("tuple[float, float, float]")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported left operand type for - ("Sequence[float]")  [operator]
+src/build123d/objects_curve.py:0: note: Left operand is of type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"
+src/build123d/objects_curve.py:0: error: No overload variant of "__add__" of "tuple" matches argument type "Vector"  [operator]
+src/build123d/objects_curve.py:0: note: Possible overload variants:
+src/build123d/objects_curve.py:0: note: def __add__(self, tuple[float, ...], /) -> tuple[float, ...]
+src/build123d/objects_curve.py:0: note: def [_T] __add__(self, tuple[_T, ...], /) -> tuple[float | _T, ...]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for + ("Sequence[float]" and "Vector")  [operator]
+src/build123d/objects_curve.py:0: note: Both left and right operands are unions
+src/build123d/objects_curve.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/objects_curve.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_curve.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_curve.py:0: error: Incompatible default for argument "direction" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/objects_curve.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_curve.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Vector] | Vector", variable has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Vector] | Vector", variable has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/objects_curve.py:0: error: Argument 1 to "get_angle" of "Vector" has incompatible type "Vector | Sequence[float]"; expected "Vector"  [arg-type]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("Sequence[float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: note: Left operand is of type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("tuple[float, float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("tuple[float, float, float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("Sequence[float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: note: Left operand is of type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("tuple[float, float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("tuple[float, float, float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("Sequence[float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: note: Left operand is of type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("tuple[float, float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for * ("tuple[float, float, float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for + ("Vector" and "float")  [operator]
+src/build123d/objects_curve.py:0: error: No overload variant of "__add__" of "tuple" matches argument type "Vector"  [operator]
+src/build123d/objects_curve.py:0: note: Possible overload variants:
+src/build123d/objects_curve.py:0: note: def __add__(self, tuple[float, ...], /) -> tuple[float, ...]
+src/build123d/objects_curve.py:0: note: def [_T] __add__(self, tuple[_T, ...], /) -> tuple[float | _T, ...]
+src/build123d/objects_curve.py:0: error: No overload variant of "__add__" of "tuple" matches argument type "float"  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for + ("Sequence[float]" and "Vector")  [operator]
+src/build123d/objects_curve.py:0: error: Unsupported operand types for + ("Sequence[float]" and "float")  [operator]
+src/build123d/objects_curve.py:0: note: Both left and right operands are unions
+src/build123d/objects_curve.py:0: error: Argument 2 to "make_line" of "Edge" has incompatible type "Vector | Any | float"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]")  [assignment]
+src/build123d/objects_curve.py:0: error: Argument 1 to "localize" of "WorkplaneList" has incompatible type "*tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Value of type "list[Vector] | Vector" is not indexable  [index]
+src/build123d/objects_curve.py:0: error: Argument 1 to "len" has incompatible type "list[Vector] | Vector"; expected "Sized"  [arg-type]
+src/build123d/objects_curve.py:0: error: Incompatible default for argument "tangents" (default has type "None", argument has type "Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]]")  [assignment]
+src/build123d/objects_curve.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_curve.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_curve.py:0: error: Incompatible default for argument "tangent_scalars" (default has type "None", argument has type "Iterable[float]")  [assignment]
+src/build123d/objects_curve.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/objects_curve.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]")  [assignment]
+src/build123d/objects_curve.py:0: error: Argument 1 to "localize" of "WorkplaneList" has incompatible type "*tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Item "list[Vector]" of "list[Vector] | Vector" has no attribute "normalized"  [union-attr]
+src/build123d/objects_curve.py:0: error: Argument 1 to "len" has incompatible type "Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]]"; expected "Sized"  [arg-type]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "Iterable[float]", variable has type "list[float]")  [assignment]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]")  [assignment]
+src/build123d/objects_curve.py:0: error: Argument 1 to "localize" of "WorkplaneList" has incompatible type "*tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]]]"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/objects_curve.py:0: error: Item "list[Vector]" of "list[Vector] | Vector" has no attribute "normalized"  [union-attr]
+src/build123d/objects_curve.py:0: error: Value of type "list[Vector] | Vector" is not indexable  [index]
+src/build123d/objects_curve.py:0: error: Incompatible types in assignment (expression has type "list[Any]", variable has type "tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], ...]")  [assignment]
+src/build123d/objects_curve.py:0: error: Argument 1 to "localize" of "WorkplaneList" has incompatible type "*tuple[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]], Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float] | Iterable[Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]]]"; expected "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]"  [arg-type]
+src/build123d/joints.py:0: error: Unsupported left operand type for * ("None")  [operator]
+src/build123d/joints.py:0: note: Both left and right operands are unions
+src/build123d/joints.py:0: error: Argument 1 to "_get_context" of "Builder" has incompatible type "RigidJoint"; expected "Builder | str"  [arg-type]
+src/build123d/joints.py:0: error: Incompatible types in assignment (expression has type "BuildPart", variable has type "Solid | Compound | None")  [assignment]
+src/build123d/joints.py:0: error: Item "None" of "Solid | Compound | None" has no attribute "location"  [union-attr]
+src/build123d/joints.py:0: error: Item "None" of "Location | Any | None" has no attribute "inverse"  [union-attr]
+src/build123d/joints.py:0: error: Item "None" of "Solid | Compound | None" has no attribute "joints"  [union-attr]
+src/build123d/joints.py:0: error: Argument 2 to "__init__" of "Joint" has incompatible type "Solid | Compound | None"; expected "Solid | Compound"  [arg-type]
+src/build123d/joints.py:0: error: Signature of "connect_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def connect_to(self, other: Joint) -> Any
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def connect_to(self, other: BallJoint, *, angles: tuple[float, float, float] | Rotation = ..., **kwargs: Any) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def connect_to(self, other: CylindricalJoint, *, position: float = ..., angle: float = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def connect_to(self, other: LinearJoint, *, position: float = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def connect_to(self, other: RevoluteJoint, *, angle: float = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def connect_to(self, other: RigidJoint) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "angles" (default has type "None", argument has type "tuple[float, float, float] | Rotation")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Signature of "relative_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def relative_to(self, other: Joint) -> Location
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def relative_to(self, other: BallJoint, *, angles: tuple[float, float, float] | Rotation = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def relative_to(self, other: CylindricalJoint, *, position: float = ..., angle: float = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def relative_to(self, other: LinearJoint, *, position: float = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def relative_to(self, other: RevoluteJoint, *, angle: float = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def relative_to(self, other: RigidJoint) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "angles" (default has type "None", argument has type "tuple[float, float, float] | Rotation")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Argument "angle" to "relative_to" of "RevoluteJoint" has incompatible type "Any | None"; expected "float"  [arg-type]
+src/build123d/joints.py:0: error: Argument "position" to "relative_to" of "LinearJoint" has incompatible type "Any | None"; expected "float"  [arg-type]
+src/build123d/joints.py:0: error: Argument "position" to "relative_to" of "CylindricalJoint" has incompatible type "Any | None"; expected "float"  [arg-type]
+src/build123d/joints.py:0: error: Argument "angle" to "relative_to" of "CylindricalJoint" has incompatible type "Any | None"; expected "float"  [arg-type]
+src/build123d/joints.py:0: error: Argument "angles" to "relative_to" of "BallJoint" has incompatible type "Any | None"; expected "tuple[float, float, float] | Rotation"  [arg-type]
+src/build123d/joints.py:0: error: Incompatible default for argument "to_part" (default has type "None", argument has type "Solid | Compound")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle_reference" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Argument 1 to "_get_context" of "Builder" has incompatible type "RevoluteJoint"; expected "Builder | str"  [arg-type]
+src/build123d/joints.py:0: error: Item "None" of "Location | None" has no attribute "inverse"  [union-attr]
+src/build123d/joints.py:0: error: Signature of "connect_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def connect_to(self, other: Joint) -> Any
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: def connect_to(self, other: RigidJoint, *, angle: float = ...) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Signature of "relative_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def relative_to(self, other: Joint) -> Location
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: def relative_to(self, other: RigidJoint, *, angle: float = ...) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible types in assignment (expression has type "float", variable has type "None")  [assignment]
+src/build123d/joints.py:0: error: Incompatible default for argument "to_part" (default has type "None", argument has type "Solid | Compound")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Argument 1 to "_get_context" of "Builder" has incompatible type "LinearJoint"; expected "Builder | str"  [arg-type]
+src/build123d/joints.py:0: error: Item "None" of "Location | None" has no attribute "inverse"  [union-attr]
+src/build123d/joints.py:0: error: Unexpected type declaration  [misc]
+src/build123d/joints.py:0: error: Signature of "connect_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def connect_to(self, other: Joint) -> Any
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def connect_to(self, other: RevoluteJoint, *, position: float = ..., angle: float = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def connect_to(self, other: RigidJoint, *, position: float = ...) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Signature of "relative_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def relative_to(self, other: Joint) -> Location
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def relative_to(self, other: RigidJoint, *, position: float = ...) -> Any
+src/build123d/joints.py:0: note: @overload
+src/build123d/joints.py:0: note: def relative_to(self, other: RevoluteJoint, *, position: float = ..., angle: float = ...) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src/build123d/joints.py:0: error: Incompatible default for argument "to_part" (default has type "None", argument has type "Solid | Compound")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle_reference" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Argument 1 to "_get_context" of "Builder" has incompatible type "CylindricalJoint"; expected "Builder | str"  [arg-type]
+src/build123d/joints.py:0: error: Item "None" of "Location | None" has no attribute "inverse"  [union-attr]
+src/build123d/joints.py:0: error: Unexpected type declaration  [misc]
+src/build123d/joints.py:0: error: Signature of "connect_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def connect_to(self, other: Joint) -> Any
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: def connect_to(self, other: RigidJoint, *, position: float = ..., angle: float = ...) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: error: Signature of "relative_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def relative_to(self, other: Joint) -> Location
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: def relative_to(self, other: RigidJoint, *, position: float = ..., angle: float = ...) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "position" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/joints.py:0: error: Incompatible types in assignment (expression has type "float", variable has type "None")  [assignment]
+src/build123d/joints.py:0: error: Incompatible types in assignment (expression has type "float", variable has type "None")  [assignment]
+src/build123d/joints.py:0: error: Unsupported left operand type for * ("None")  [operator]
+src/build123d/joints.py:0: note: Both left and right operands are unions
+src/build123d/joints.py:0: error: Argument 1 to "_get_context" of "Builder" has incompatible type "BallJoint"; expected "Builder | str"  [arg-type]
+src/build123d/joints.py:0: error: Incompatible types in assignment (expression has type "BuildPart", variable has type "Solid | Compound | None")  [assignment]
+src/build123d/joints.py:0: error: Item "None" of "Solid | Compound | None" has no attribute "location"  [union-attr]
+src/build123d/joints.py:0: error: Item "None" of "Location | Any | None" has no attribute "inverse"  [union-attr]
+src/build123d/joints.py:0: error: Item "None" of "Solid | Compound | None" has no attribute "joints"  [union-attr]
+src/build123d/joints.py:0: error: Argument 2 to "__init__" of "Joint" has incompatible type "Solid | Compound | None"; expected "Solid | Compound"  [arg-type]
+src/build123d/joints.py:0: error: Signature of "connect_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def connect_to(self, other: Joint) -> Any
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: def connect_to(self, other: RigidJoint, *, angles: tuple[float, float, float] | Rotation = ...) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "angles" (default has type "None", argument has type "tuple[float, float, float] | Rotation")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: Signature of "relative_to" incompatible with supertype "Joint"  [override]
+src/build123d/joints.py:0: note: Superclass:
+src/build123d/joints.py:0: note: def relative_to(self, other: Joint) -> Location
+src/build123d/joints.py:0: note: Subclass:
+src/build123d/joints.py:0: note: def relative_to(self, other: RigidJoint, *, angles: tuple[float, float, float] | Rotation = ...) -> Any
+src/build123d/joints.py:0: error: Incompatible default for argument "angles" (default has type "None", argument has type "tuple[float, float, float] | Rotation")  [assignment]
+src/build123d/joints.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/joints.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/joints.py:0: error: No overload variant of "Rotation" matches argument type "list[float]"  [call-overload]
+src/build123d/joints.py:0: note: Possible overload variants:
+src/build123d/joints.py:0: note: def __init__(self, rotation: tuple[float, float, float] | Rotation, ordering: Any) -> Rotation
+src/build123d/joints.py:0: note: def __init__(self, X: float = ..., Y: float = ..., Z: float = ..., ordering: Extrinsic | Intrinsic = ...) -> Rotation
+src/build123d/joints.py:0: error: Expected iterable as variadic argument  [misc]
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "rotation" (default has type "None", argument has type "float | tuple[float, float, float] | Rotation")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Argument 1 to "_get_context" of "Builder" has incompatible type "None"; expected "Builder | str"  [arg-type]
+src/build123d/operations_generic.py:0: error: Item "Builder" of "Edge | Wire | Face | Solid | Compound | Builder | Iterable[Edge | Wire | Face | Solid | Compound | Builder]" has no attribute "__iter__" (not iterable)  [union-attr]
+src/build123d/operations_generic.py:0: error: Argument 3 to "validate_inputs" has incompatible type "Edge | Wire | Face | Solid | Compound | list[Edge | Wire | Face | Solid | Compound | Builder]"; expected "Iterable[Shape[Any]]"  [arg-type]
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "objects" (default has type "None", argument has type "Shape[Any] | Iterable[Shape[Any]]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Missing return statement  [return]
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "length2" (default has type "None", argument has type "float")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "angle" (default has type "None", argument has type "float")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "reference" (default has type "None", argument has type "Edge | Face")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible types in assignment (expression has type "filter[Any]", variable has type "list[Any]")  [assignment]
+src/build123d/operations_generic.py:0: error: Missing return statement  [return]
+src/build123d/operations_generic.py:0: error: Incompatible types in assignment (expression has type "filter[Any]", variable has type "list[Any]")  [assignment]
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "objects" (default has type "None", argument has type "Edge | Wire | Face | Compound | Curve | Sketch | Part | Iterable[Edge | Wire | Face | Compound | Curve | Sketch | Part]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "objects" (default has type "None", argument has type "Edge | Face | Solid | Compound | Iterable[Edge | Face | Solid | Compound]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "openings" (default has type "None", argument has type "Face | list[Face]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "min_edge_length" (default has type "None", argument has type "float")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible types in assignment (expression has type "Face | ShapeList[Face]", variable has type "Face")  [assignment]
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "objects" (default has type "None", argument has type "Edge | Face | Wire | Vector | Vertex | Iterable[Edge | Face | Wire | Vector | Vertex]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "workplane" (default has type "None", argument has type "Plane")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "target" (default has type "None", argument has type "Solid | Compound | Part")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Value of type "None" is not indexable  [index]
+src/build123d/operations_generic.py:0: error: List comprehension has incompatible type List[Vector]; expected List[Edge | Vertex]  [misc]
+src/build123d/operations_generic.py:0: error: Value of type variable "T" of "ShapeList" cannot be "ShapeList[Face | Shell]"  [type-var]
+src/build123d/operations_generic.py:0: error: Incompatible return value type (got "ShapeList[ShapeList[Face | Shell]]", expected "Curve | Sketch | Compound | ShapeList[Vector]")  [return-value]
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "objects" (default has type "None", argument has type "Shape[Any] | Iterable[Shape[Any]]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible types in assignment (expression has type "Vector", variable has type "float")  [assignment]
+src/build123d/operations_generic.py:0: error: "float" has no attribute "X"  [attr-defined]
+src/build123d/operations_generic.py:0: error: "float" has no attribute "Y"  [attr-defined]
+src/build123d/operations_generic.py:0: error: "float" has no attribute "Z"  [attr-defined]
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "objects" (default has type "None", argument has type "Edge | Wire | Face | Solid | Iterable[Edge | Wire | Face | Solid]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Need type annotation for "new_objects" (hint: "new_objects: list[<type>] = ...")  [var-annotated]
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "sections" (default has type "None", argument has type "Compound | Edge | Wire | Face | Solid | Iterable[Compound | Edge | Wire | Face | Solid]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "path" (default has type "None", argument has type "Curve | Edge | Wire | Iterable[Edge]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "normal" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Incompatible default for argument "binormal" (default has type "None", argument has type "Edge | Wire")  [assignment]
+src/build123d/operations_generic.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/operations_generic.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/operations_generic.py:0: error: Need type annotation for "edge_list" (hint: "edge_list: list[<type>] = ...")  [var-annotated]
+src/build123d/operations_generic.py:0: error: Need type annotation for "new_faces" (hint: "new_faces: list[<type>] = ...")  [var-annotated]
+src/build123d/drafting.py:0: error: Argument "align" to "Polygon" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/drafting.py:0: error: Argument "align" to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/drafting.py:0: error: Item "ShapeList[ArrowHead]" of "ArrowHead | ShapeList[ArrowHead]" has no attribute "clean"  [union-attr]
+src/build123d/drafting.py:0: error: Argument "align" to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/drafting.py:0: error: Incompatible default for argument "tolerance" (default has type "None", argument has type "float | tuple[float, float]")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: The return type of "__init__" must be None  [misc]
+src/build123d/drafting.py:0: error: Missing return statement  [return]
+src/build123d/drafting.py:0: error: Incompatible default for argument "draft" (default has type "None", argument has type "Draft")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Incompatible default for argument "sketch" (default has type "None", argument has type "Sketch")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Incompatible default for argument "label" (default has type "None", argument has type "str")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Incompatible default for argument "tolerance" (default has type "None", argument has type "float | tuple[float, float]")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Item "None" of "Compound | ShapeList[Compound] | None" has no attribute "area"  [union-attr]
+src/build123d/drafting.py:0: error: Item "ShapeList[Compound]" of "Compound | ShapeList[Compound] | None" has no attribute "area"  [union-attr]
+src/build123d/drafting.py:0: error: Item "None" of "Compound | ShapeList[Compound] | None" has no attribute "area"  [union-attr]
+src/build123d/drafting.py:0: error: Item "ShapeList[Compound]" of "Compound | ShapeList[Compound] | None" has no attribute "area"  [union-attr]
+src/build123d/drafting.py:0: error: Incompatible types in assignment (expression has type "list[tuple[Compound, float]]", variable has type "dict[Compound, float]")  [assignment]
+src/build123d/drafting.py:0: error: Value of type "float" is not indexable  [index]
+src/build123d/drafting.py:0: error: Invalid index type "int" for "dict[Compound, float]"; expected type "Compound"  [index]
+src/build123d/drafting.py:0: error: Argument "align" to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/drafting.py:0: error: Incompatible default for argument "sketch" (default has type "None", argument has type "Sketch")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Incompatible default for argument "label" (default has type "None", argument has type "str")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Incompatible default for argument "tolerance" (default has type "None", argument has type "float | tuple[float, float]")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Incompatible default for argument "project_line" (default has type "None", argument has type "Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Incompatible default for argument "sheet_number" (default has type "None", argument has type "int")  [assignment]
+src/build123d/drafting.py:0: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+src/build123d/drafting.py:0: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
+src/build123d/drafting.py:0: error: Incompatible types in assignment (expression has type "str", variable has type "int")  [assignment]
+src/build123d/drafting.py:0: error: Argument 1 to "make_text" of "Compound" has incompatible type "int"; expected "str"  [arg-type]
+src/build123d/drafting.py:0: error: Argument "align" to "__init__" of "BaseSketchObject" has incompatible type "None"; expected "Align | tuple[Align, Align]"  [arg-type]
+src/build123d/__init__.py:0: error: Incompatible import of "copy" (imported name has type Module, local name has type "Callable[[_T], _T]")  [assignment]
+src/build123d/__init__.py:0: error: Incompatible import of "copy" (imported name has type Module, local name has type "Callable[[_T], _T]")  [assignment]
+src/build123d/__init__.py:0: error: Incompatible import of "copy" (imported name has type Module, local name has type "Callable[[_T], _T]")  [assignment]
+src/build123d/__init__.py:0: error: Incompatible import of "copy" (imported name has type Module, local name has type "Callable[[_T], _T]")  [assignment]
