@@ -76,7 +76,7 @@ class BaseSketchObject(Sketch):
 
     def __init__(
         self,
-        obj: Compound | Face,
+        obj: Compound | Face | None,
         rotation: float = 0,
         align: Align | tuple[Align, Align] | None = None,
         mode: Mode = Mode.ADD,
@@ -202,8 +202,8 @@ class Polygon(BaseSketchObject):
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
-        pts = flatten_sequence(*pts)
-        self.pts = pts
+        flattened_pts = flatten_sequence(*pts)
+        self.pts = flattened_pts
         self.align = tuplify(align, 2)
 
         poly_pts = [Vector(p) for p in pts]
@@ -354,9 +354,9 @@ class RegularPolygon(BaseSketchObject):
         maxs = [pts_sorted[0][-1].X, pts_sorted[1][-1].Y]
 
         align_offset = to_align_offset(mins, maxs, align, center=(0, 0))
-        pts = [point + align_offset for point in pts]
+        pts_ao = [point + align_offset for point in pts]
 
-        face = Face(Wire.make_polygon(pts))
+        face = Face(Wire.make_polygon(pts_ao))
         super().__init__(face, rotation=0, align=None, mode=mode)
 
 
@@ -525,7 +525,7 @@ class SlotOverall(BaseSketchObject):
         self.slot_height = height
 
         if width != height:
-            face = Face(
+            face: Face | None = Face(
                 Wire(
                     [
                         Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
@@ -569,9 +569,9 @@ class Text(BaseSketchObject):
         font_path: str | None = None,
         font_style: FontStyle = FontStyle.REGULAR,
         align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
-        path: Edge | Wire = None,
+        path: Edge | Wire | None = None,
         position_on_path: float = 0.0,
-        rotation: float = 0,
+        rotation: float = 0.0,
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -594,7 +594,7 @@ class Text(BaseSketchObject):
             font=font,
             font_path=font_path,
             font_style=font_style,
-            align=tuplify(align, 2),
+            align=align,
             position_on_path=position_on_path,
             text_path=path,
         )
@@ -741,7 +741,9 @@ class Triangle(BaseSketchObject):
                 [Vector(0, 0), Vector(ar, 0), Vector(cr, 0).rotate(Axis.Z, self.B)]
             )
         )
-        center_of_geometry = sum(Vector(v) for v in triangle.vertices()) / 3
+        center_of_geometry = (
+            sum((Vector(v) for v in triangle.vertices()), Vector(0, 0, 0)) / 3
+        )
         triangle.move(Location(-center_of_geometry))
         alignment = None if align is None else tuplify(align, 2)
         super().__init__(obj=triangle, rotation=rotation, align=alignment, mode=mode)
