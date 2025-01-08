@@ -30,7 +30,9 @@ license:
 import copy
 import logging
 from math import radians, tan
-from typing import Union, Iterable
+from typing import Union
+
+from collections.abc import Iterable
 
 from build123d.build_common import (
     Builder,
@@ -81,8 +83,8 @@ AddType = Union[Edge, Wire, Face, Solid, Compound, Builder]
 
 
 def add(
-    objects: Union[AddType, Iterable[AddType]],
-    rotation: Union[float, RotationLike] = None,
+    objects: AddType | Iterable[AddType],
+    rotation: float | RotationLike = None,
     clean: bool = True,
     mode: Mode = Mode.ADD,
 ) -> Compound:
@@ -199,9 +201,9 @@ def add(
 
 
 def bounding_box(
-    objects: Union[Shape, Iterable[Shape]] = None,
+    objects: Shape | Iterable[Shape] = None,
     mode: Mode = Mode.PRIVATE,
-) -> Union[Sketch, Part]:
+) -> Sketch | Part:
     """Generic Operation: Add Bounding Box
 
     Applies to: BuildSketch and BuildPart
@@ -264,12 +266,12 @@ ChamferFilletType = Union[Edge, Vertex]
 
 
 def chamfer(
-    objects: Union[ChamferFilletType, Iterable[ChamferFilletType]],
+    objects: ChamferFilletType | Iterable[ChamferFilletType],
     length: float,
     length2: float = None,
     angle: float = None,
-    reference: Union[Edge, Face] = None,
-) -> Union[Sketch, Part]:
+    reference: Edge | Face = None,
+) -> Sketch | Part:
     """Generic Operation: chamfer
 
     Applies to 2 and 3 dimensional objects.
@@ -385,9 +387,9 @@ def chamfer(
 
 
 def fillet(
-    objects: Union[ChamferFilletType, Iterable[ChamferFilletType]],
+    objects: ChamferFilletType | Iterable[ChamferFilletType],
     radius: float,
-) -> Union[Sketch, Part, Curve]:
+) -> Sketch | Part | Curve:
     """Generic Operation: fillet
 
     Applies to 2 and 3 dimensional objects.
@@ -488,10 +490,10 @@ MirrorType = Union[Edge, Wire, Face, Compound, Curve, Sketch, Part]
 
 
 def mirror(
-    objects: Union[MirrorType, Iterable[MirrorType]] = None,
+    objects: MirrorType | Iterable[MirrorType] = None,
     about: Plane = Plane.XZ,
     mode: Mode = Mode.ADD,
-) -> Union[Curve, Sketch, Part, Compound]:
+) -> Curve | Sketch | Part | Compound:
     """Generic Operation: mirror
 
     Applies to 1, 2, and 3 dimensional objects.
@@ -538,15 +540,15 @@ OffsetType = Union[Edge, Face, Solid, Compound]
 
 
 def offset(
-    objects: Union[OffsetType, Iterable[OffsetType]] = None,
+    objects: OffsetType | Iterable[OffsetType] = None,
     amount: float = 0,
-    openings: Union[Face, list[Face]] = None,
+    openings: Face | list[Face] = None,
     kind: Kind = Kind.ARC,
     side: Side = Side.BOTH,
     closed: bool = True,
     min_edge_length: float = None,
     mode: Mode = Mode.REPLACE,
-) -> Union[Curve, Sketch, Part, Compound]:
+) -> Curve | Sketch | Part | Compound:
     """Generic Operation: offset
 
     Applies to 1, 2, and 3 dimensional objects.
@@ -682,11 +684,11 @@ ProjectType = Union[Edge, Face, Wire, Vector, Vertex]
 
 
 def project(
-    objects: Union[ProjectType, Iterable[ProjectType]] = None,
+    objects: ProjectType | Iterable[ProjectType] = None,
     workplane: Plane = None,
-    target: Union[Solid, Compound, Part] = None,
+    target: Solid | Compound | Part = None,
     mode: Mode = Mode.ADD,
-) -> Union[Curve, Sketch, Compound, ShapeList[Vector]]:
+) -> Curve | Sketch | Compound | ShapeList[Vector]:
     """Generic Operation: project
 
     Applies to 0, 1, and 2 dimensional objects.
@@ -823,10 +825,10 @@ def project(
 
 
 def scale(
-    objects: Union[Shape, Iterable[Shape]] = None,
-    by: Union[float, tuple[float, float, float]] = 1,
+    objects: Shape | Iterable[Shape] = None,
+    by: float | tuple[float, float, float] = 1,
     mode: Mode = Mode.REPLACE,
-) -> Union[Curve, Sketch, Part, Compound]:
+) -> Curve | Sketch | Part | Compound:
     """Generic Operation: scale
 
     Applies to 1, 2, and 3 dimensional objects.
@@ -903,8 +905,8 @@ SplitType = Union[Edge, Wire, Face, Solid]
 
 
 def split(
-    objects: Union[SplitType, Iterable[SplitType]] = None,
-    bisect_by: Union[Plane, Face, Shell] = Plane.XZ,
+    objects: SplitType | Iterable[SplitType] = None,
+    bisect_by: Plane | Face | Shell = Plane.XZ,
     keep: Keep = Keep.TOP,
     mode: Mode = Mode.REPLACE,
 ):
@@ -966,16 +968,16 @@ SweepType = Union[Compound, Edge, Wire, Face, Solid]
 
 
 def sweep(
-    sections: Union[SweepType, Iterable[SweepType]] = None,
-    path: Union[Curve, Edge, Wire, Iterable[Edge]] = None,
+    sections: SweepType | Iterable[SweepType] = None,
+    path: Curve | Edge | Wire | Iterable[Edge] = None,
     multisection: bool = False,
     is_frenet: bool = False,
     transition: Transition = Transition.TRANSFORMED,
     normal: VectorLike = None,
-    binormal: Union[Edge, Wire] = None,
+    binormal: Edge | Wire = None,
     clean: bool = True,
     mode: Mode = Mode.ADD,
-) -> Union[Part, Sketch]:
+) -> Part | Sketch:
     """Generic Operation: sweep
 
     Sweep pending 1D or 2D objects along path.

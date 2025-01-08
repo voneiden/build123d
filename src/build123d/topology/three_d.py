@@ -57,7 +57,9 @@ from __future__ import annotations
 import platform
 import warnings
 from math import radians, cos, tan
-from typing import Iterable, Union, TYPE_CHECKING
+from typing import Union, TYPE_CHECKING
+
+from collections.abc import Iterable
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
@@ -219,7 +221,7 @@ class Mixin3D(Shape):
         """
         edge_list = list(edge_list)
         if face:
-            if any((edge for edge in edge_list if edge not in face.edges())):
+            if any(edge for edge in edge_list if edge not in face.edges()):
                 raise ValueError("Some edges are not part of the face")
 
         native_edges = [e.wrapped for e in edge_list]
@@ -264,7 +266,7 @@ class Mixin3D(Shape):
     def dprism(
         self,
         basis: Face | None,
-        bounds: list[Union[Face, Wire]],
+        bounds: list[Face | Wire],
         depth: float | None = None,
         taper: float = 0,
         up_to_face: Face | None = None,
@@ -1042,7 +1044,7 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
 
     @classmethod
     def make_loft(
-        cls, objs: Iterable[Union[Vertex, Wire]], ruled: bool = False
+        cls, objs: Iterable[Vertex | Wire], ruled: bool = False
     ) -> Solid:
         """make loft
 
@@ -1277,7 +1279,7 @@ class Solid(Mixin3D, Shape[TopoDS_Solid]):
     @classmethod
     def sweep_multi(
         cls,
-        profiles: Iterable[Union[Wire, Face]],
+        profiles: Iterable[Wire | Face],
         path: Wire | Edge,
         make_solid: bool = True,
         is_frenet: bool = False,

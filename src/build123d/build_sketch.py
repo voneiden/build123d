@@ -87,7 +87,7 @@ class BuildSketch(Builder):
 
     def __init__(
         self,
-        *workplanes: Union[Face, Plane, Location],
+        *workplanes: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
@@ -103,7 +103,7 @@ class BuildSketch(Builder):
         """solid() not implemented"""
         raise NotImplementedError("solid() doesn't apply to BuildSketch")
 
-    def consolidate_edges(self) -> Union[Wire, list[Wire]]:
+    def consolidate_edges(self) -> Wire | list[Wire]:
         """Unify pending edges into one or more Wires"""
         wires = Wire.combine(self.pending_edges)
         return wires if len(wires) > 1 else wires[0]

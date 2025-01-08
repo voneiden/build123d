@@ -31,7 +31,9 @@ from __future__ import annotations
 import copy
 from math import copysign, cos, radians, sin, sqrt
 from scipy.optimize import minimize
-from typing import Iterable, Union
+from typing import Union
+
+from collections.abc import Iterable
 
 from build123d.build_common import WorkplaneList, flatten_sequence, validate_inputs
 from build123d.build_enums import AngularDirection, GeomType, Keep, LengthMode, Mode
@@ -197,7 +199,7 @@ class DoubleTangentArc(BaseEdgeObject):
         self,
         pnt: VectorLike,
         tangent: VectorLike,
-        other: Union[Curve, Edge, Wire],
+        other: Curve | Edge | Wire,
         keep: Keep = Keep.TOP,
         mode: Mode = Mode.ADD,
     ):
@@ -489,7 +491,7 @@ class FilletPolyline(BaseLineObject):
 
     def __init__(
         self,
-        *pts: Union[VectorLike, Iterable[VectorLike]],
+        *pts: VectorLike | Iterable[VectorLike],
         radius: float,
         close: bool = False,
         mode: Mode = Mode.ADD,
@@ -537,9 +539,9 @@ class FilletPolyline(BaseLineObject):
         for vertex, edges in vertex_to_edges.items():
             if len(edges) != 2:
                 continue
-            other_vertices = set(
+            other_vertices = {
                 ve for e in edges for ve in e.vertices() if ve != vertex
-            )
+            }
             third_edge = Edge.make_line(*[v.to_tuple() for v in other_vertices])
             fillet_face = Face(Wire(edges + [third_edge])).fillet_2d(radius, [vertex])
             fillets.append(fillet_face.edges().filter_by(GeomType.CIRCLE)[0])
@@ -641,7 +643,7 @@ class Line(BaseEdgeObject):
     _applies_to = [BuildLine._tag]
 
     def __init__(
-        self, *pts: Union[VectorLike, Iterable[VectorLike]], mode: Mode = Mode.ADD
+        self, *pts: VectorLike | Iterable[VectorLike], mode: Mode = Mode.ADD
     ):
         pts = flatten_sequence(*pts)
         if len(pts) != 2:
@@ -677,7 +679,7 @@ class IntersectingLine(BaseEdgeObject):
         self,
         start: VectorLike,
         direction: VectorLike,
-        other: Union[Curve, Edge, Wire],
+        other: Curve | Edge | Wire,
         mode: Mode = Mode.ADD,
     ):
         context: BuildLine = BuildLine._get_context(self)
@@ -777,7 +779,7 @@ class Polyline(BaseLineObject):
 
     def __init__(
         self,
-        *pts: Union[VectorLike, Iterable[VectorLike]],
+        *pts: VectorLike | Iterable[VectorLike],
         close: bool = False,
         mode: Mode = Mode.ADD,
     ):
@@ -912,7 +914,7 @@ class Spline(BaseEdgeObject):
 
     def __init__(
         self,
-        *pts: Union[VectorLike, Iterable[VectorLike]],
+        *pts: VectorLike | Iterable[VectorLike],
         tangents: Iterable[VectorLike] = None,
         tangent_scalars: Iterable[float] = None,
         periodic: bool = False,
@@ -972,7 +974,7 @@ class TangentArc(BaseEdgeObject):
 
     def __init__(
         self,
-        *pts: Union[VectorLike, Iterable[VectorLike]],
+        *pts: VectorLike | Iterable[VectorLike],
         tangent: VectorLike,
         tangent_from_first: bool = True,
         mode: Mode = Mode.ADD,
@@ -1010,7 +1012,7 @@ class ThreePointArc(BaseEdgeObject):
     _applies_to = [BuildLine._tag]
 
     def __init__(
-        self, *pts: Union[VectorLike, Iterable[VectorLike]], mode: Mode = Mode.ADD
+        self, *pts: VectorLike | Iterable[VectorLike], mode: Mode = Mode.ADD
     ):
         context: BuildLine = BuildLine._get_context(self)
         validate_inputs(context, self)

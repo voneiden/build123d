@@ -31,7 +31,9 @@ from __future__ import annotations
 import trianglesolver
 
 from math import cos, degrees, pi, radians, sin, tan
-from typing import Iterable, Union
+from typing import Union
+
+from collections.abc import Iterable
 
 from build123d.build_common import LocationList, flatten_sequence, validate_inputs
 from build123d.build_enums import Align, FontStyle, Mode
@@ -74,9 +76,9 @@ class BaseSketchObject(Sketch):
 
     def __init__(
         self,
-        obj: Union[Compound, Face],
+        obj: Compound | Face,
         rotation: float = 0,
-        align: Union[Align, tuple[Align, Align]] = None,
+        align: Align | tuple[Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
         if align is not None:
@@ -121,7 +123,7 @@ class Circle(BaseSketchObject):
     def __init__(
         self,
         radius: float,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -155,7 +157,7 @@ class Ellipse(BaseSketchObject):
         x_radius: float,
         y_radius: float,
         rotation: float = 0,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -192,9 +194,9 @@ class Polygon(BaseSketchObject):
 
     def __init__(
         self,
-        *pts: Union[VectorLike, Iterable[VectorLike]],
+        *pts: VectorLike | Iterable[VectorLike],
         rotation: float = 0,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -230,7 +232,7 @@ class Rectangle(BaseSketchObject):
         width: float,
         height: float,
         rotation: float = 0,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -267,7 +269,7 @@ class RectangleRounded(BaseSketchObject):
         height: float,
         radius: float,
         rotation: float = 0,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -374,7 +376,7 @@ class SlotArc(BaseSketchObject):
 
     def __init__(
         self,
-        arc: Union[Edge, Wire],
+        arc: Edge | Wire,
         height: float,
         rotation: float = 0,
         mode: Mode = Mode.ADD,
@@ -508,7 +510,7 @@ class SlotOverall(BaseSketchObject):
         width: float,
         height: float,
         rotation: float = 0,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         if width <= height:
@@ -566,8 +568,8 @@ class Text(BaseSketchObject):
         font: str = "Arial",
         font_path: str = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
-        path: Union[Edge, Wire] = None,
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        path: Edge | Wire = None,
         position_on_path: float = 0.0,
         rotation: float = 0,
         mode: Mode = Mode.ADD,
@@ -628,7 +630,7 @@ class Trapezoid(BaseSketchObject):
         left_side_angle: float,
         right_side_angle: float = None,
         rotation: float = 0,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -714,7 +716,7 @@ class Triangle(BaseSketchObject):
         A: float = None,
         B: float = None,
         C: float = None,
-        align: Union[None, Align, tuple[Align, Align]] = None,
+        align: None | Align | tuple[Align, Align] = None,
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):

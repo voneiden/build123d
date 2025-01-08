@@ -79,7 +79,7 @@ class BuildPart(Builder):
 
     def __init__(
         self,
-        *workplanes: Union[Face, Plane, Location],
+        *workplanes: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
         self.joints: dict[str, Joint] = {}
@@ -90,7 +90,7 @@ class BuildPart(Builder):
         self.pending_edges: list[Edge] = []
         super().__init__(*workplanes, mode=mode)
 
-    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
+    def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane = None):
         """Add objects to BuildPart pending lists
 
         Args:

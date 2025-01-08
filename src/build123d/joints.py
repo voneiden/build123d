@@ -75,8 +75,8 @@ class RigidJoint(Joint):
     def __init__(
         self,
         label: str,
-        to_part: Optional[Union[Solid, Compound]] = None,
-        joint_location: Union[Location, None] = None,
+        to_part: Solid | Compound | None = None,
+        joint_location: Location | None = None,
     ):
         context: BuildPart = BuildPart._get_context(self)
         validate_inputs(context, self)
@@ -244,7 +244,7 @@ class RevoluteJoint(Joint):
     def __init__(
         self,
         label: str,
-        to_part: Union[Solid, Compound] = None,
+        to_part: Solid | Compound = None,
         axis: Axis = Axis.Z,
         angle_reference: VectorLike = None,
         angular_range: tuple[float, float] = (0, 360),
@@ -353,7 +353,7 @@ class LinearJoint(Joint):
     def __init__(
         self,
         label: str,
-        to_part: Union[Solid, Compound] = None,
+        to_part: Solid | Compound = None,
         axis: Axis = Axis.Z,
         linear_range: tuple[float, float] = (0, inf),
     ):
@@ -530,7 +530,7 @@ class CylindricalJoint(Joint):
     def __init__(
         self,
         label: str,
-        to_part: Union[Solid, Compound] = None,
+        to_part: Solid | Compound = None,
         axis: Axis = Axis.Z,
         angle_reference: VectorLike = None,
         linear_range: tuple[float, float] = (0, inf),
@@ -680,8 +680,8 @@ class BallJoint(Joint):
     def __init__(
         self,
         label: str,
-        to_part: Optional[Union[Solid, Compound]] = None,
-        joint_location: Optional[Location] = None,
+        to_part: Solid | Compound | None = None,
+        joint_location: Location | None = None,
         angular_range: tuple[
             tuple[float, float], tuple[float, float], tuple[float, float]
         ] = ((0, 360), (0, 360), (0, 360)),
