@@ -78,7 +78,7 @@ class BaseSketchObject(Sketch):
         self,
         obj: Compound | Face,
         rotation: float = 0,
-        align: Align | tuple[Align, Align] = None,
+        align: Align | tuple[Align, Align] | None = None,
         mode: Mode = Mode.ADD,
     ):
         if align is not None:
@@ -123,7 +123,7 @@ class Circle(BaseSketchObject):
     def __init__(
         self,
         radius: float,
-        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -157,7 +157,7 @@ class Ellipse(BaseSketchObject):
         x_radius: float,
         y_radius: float,
         rotation: float = 0,
-        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -196,14 +196,14 @@ class Polygon(BaseSketchObject):
         self,
         *pts: VectorLike | Iterable[VectorLike],
         rotation: float = 0,
-        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
-        pts = flatten_sequence(*pts)
-        self.pts = pts
+        flattened_pts = flatten_sequence(*pts)
+        self.pts = flattened_pts
         self.align = tuplify(align, 2)
 
         poly_pts = [Vector(p) for p in pts]
@@ -232,7 +232,7 @@ class Rectangle(BaseSketchObject):
         width: float,
         height: float,
         rotation: float = 0,
-        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -269,7 +269,7 @@ class RectangleRounded(BaseSketchObject):
         height: float,
         radius: float,
         rotation: float = 0,
-        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -354,9 +354,9 @@ class RegularPolygon(BaseSketchObject):
         maxs = [pts_sorted[0][-1].X, pts_sorted[1][-1].Y]
 
         align_offset = to_align_offset(mins, maxs, align, center=(0, 0))
-        pts = [point + align_offset for point in pts]
+        pts_ao = [point + align_offset for point in pts]
 
-        face = Face(Wire.make_polygon(pts))
+        face = Face(Wire.make_polygon(pts_ao))
         super().__init__(face, rotation=0, align=None, mode=mode)
 
 
@@ -510,7 +510,7 @@ class SlotOverall(BaseSketchObject):
         width: float,
         height: float,
         rotation: float = 0,
-        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         if width <= height:
@@ -525,7 +525,7 @@ class SlotOverall(BaseSketchObject):
         self.slot_height = height
 
         if width != height:
-            face = Face(
+            face: Face | None = Face(
                 Wire(
                     [
                         Edge.make_line(Vector(-width / 2 + height / 2, 0, 0), Vector()),
@@ -566,14 +566,14 @@ class Text(BaseSketchObject):
         txt: str,
         font_size: float,
         font: str = "Arial",
-        font_path: str = None,
+        font_path: str | None = None,
         font_style: FontStyle = FontStyle.REGULAR,
-        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
-        path: Edge | Wire = None,
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
+        path: Edge | Wire | None = None,
         position_on_path: float = 0.0,
-        rotation: float = 0,
+        rotation: float = 0.0,
         mode: Mode = Mode.ADD,
-    ) -> Compound:
+    ):
         context = BuildSketch._get_context(self)
         validate_inputs(context, self)
 
@@ -594,7 +594,7 @@ class Text(BaseSketchObject):
             font=font,
             font_path=font_path,
             font_style=font_style,
-            align=tuplify(align, 2),
+            align=align,
             position_on_path=position_on_path,
             text_path=path,
         )
@@ -628,9 +628,9 @@ class Trapezoid(BaseSketchObject):
         width: float,
         height: float,
         left_side_angle: float,
-        right_side_angle: float = None,
+        right_side_angle: float | None = None,
         rotation: float = 0,
-        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] | None = (Align.CENTER, Align.CENTER),
         mode: Mode = Mode.ADD,
     ):
         context = BuildSketch._get_context(self)
@@ -710,13 +710,13 @@ class Triangle(BaseSketchObject):
     def __init__(
         self,
         *,
-        a: float = None,
-        b: float = None,
-        c: float = None,
-        A: float = None,
-        B: float = None,
-        C: float = None,
-        align: None | Align | tuple[Align, Align] = None,
+        a: float | None = None,
+        b: float | None = None,
+        c: float | None = None,
+        A: float | None = None,
+        B: float | None = None,
+        C: float | None = None,
+        align: Align | tuple[Align, Align] | None = None,
         rotation: float = 0,
         mode: Mode = Mode.ADD,
     ):
@@ -729,27 +729,29 @@ class Triangle(BaseSketchObject):
             raise ValueError("One length and two other values must be provided")
 
         A, B, C = (radians(angle) if angle is not None else None for angle in [A, B, C])
-        a, b, c, A, B, C = trianglesolver.solve(a, b, c, A, B, C)
-        self.a = a  #: length of side 'a'
-        self.b = b  #: length of side 'b'
-        self.c = c  #: length of side 'c'
-        self.A = degrees(A)  #: interior angle 'A' in degrees
-        self.B = degrees(B)  #: interior angle 'B' in degrees
-        self.C = degrees(C)  #: interior angle 'C' in degrees
+        ar, br, cr, Ar, Br, Cr = trianglesolver.solve(a, b, c, A, B, C)
+        self.a = ar  #: length of side 'a'
+        self.b = br  #: length of side 'b'
+        self.c = cr  #: length of side 'c'
+        self.A = degrees(Ar)  #: interior angle 'A' in degrees
+        self.B = degrees(Br)  #: interior angle 'B' in degrees
+        self.C = degrees(Cr)  #: interior angle 'C' in degrees
         triangle = Face(
             Wire.make_polygon(
-                [Vector(0, 0), Vector(a, 0), Vector(c, 0).rotate(Axis.Z, self.B)]
+                [Vector(0, 0), Vector(ar, 0), Vector(cr, 0).rotate(Axis.Z, self.B)]
             )
         )
-        center_of_geometry = sum(Vector(v) for v in triangle.vertices()) / 3
+        center_of_geometry = (
+            sum((Vector(v) for v in triangle.vertices()), Vector(0, 0, 0)) / 3
+        )
         triangle.move(Location(-center_of_geometry))
         alignment = None if align is None else tuplify(align, 2)
         super().__init__(obj=triangle, rotation=rotation, align=alignment, mode=mode)
-        self.edge_a = self.edges().filter_by(lambda e: abs(e.length - a) < TOLERANCE)[
+        self.edge_a = self.edges().filter_by(lambda e: abs(e.length - ar) < TOLERANCE)[
             0
         ]  #: edge 'a'
         self.edge_b = self.edges().filter_by(
-            lambda e: abs(e.length - b) < TOLERANCE and e not in [self.edge_a]
+            lambda e: abs(e.length - br) < TOLERANCE and e not in [self.edge_a]
         )[
             0
         ]  #: edge 'b'
