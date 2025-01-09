@@ -76,7 +76,7 @@ class BaseSketchObject(Sketch):
 
     def __init__(
         self,
-        obj: Compound | Face | None,
+        obj: Compound | Face,
         rotation: float = 0,
         align: Align | tuple[Align, Align] | None = None,
         mode: Mode = Mode.ADD,
