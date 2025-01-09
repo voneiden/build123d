@@ -12,7 +12,9 @@ desc:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Collection, Optional, cast
+from typing import Optional, cast
+
+from collections.abc import Callable, Collection
 
 from build123d import Location, Shape, Pos
 
@@ -37,8 +39,8 @@ def _pack2d(
         y: float = 0
         w: float = 0
         h: float = 0
-        down: Optional["_Node"] = None
-        right: Optional["_Node"] = None
+        down: _Node | None = None
+        right: _Node | None = None
 
     def find_node(start, w, h):
         if start.used:

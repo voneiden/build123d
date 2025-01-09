@@ -79,7 +79,7 @@ class BuildLine(Builder):
 
     def __init__(
         self,
-        workplane: Union[Face, Plane, Location] = Plane.XY,
+        workplane: Face | Plane | Location = Plane.XY,
         mode: Mode = Mode.ADD,
     ):
         self.line: Curve = None
@@ -126,6 +126,6 @@ class BuildLine(Builder):
         """solid() not implemented"""
         raise NotImplementedError("solid() doesn't apply to BuildLine")
 
-    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
+    def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane = None):
         """_add_to_pending not implemented"""
         raise NotImplementedError("_add_to_pending doesn't apply to BuildLine")

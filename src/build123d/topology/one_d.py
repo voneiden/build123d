@@ -56,7 +56,9 @@ import itertools
 import warnings
 from itertools import combinations
 from math import radians, inf, pi, cos, copysign, ceil, floor
-from typing import Iterable, Tuple, Union, overload, TYPE_CHECKING
+from typing import Tuple, Union, overload, TYPE_CHECKING
+
+from collections.abc import Iterable
 
 import OCP.TopAbs as ta
 from OCP.BRep import BRep_Tool
@@ -164,7 +166,9 @@ from build123d.geometry import (
 from numpy import ndarray
 from scipy.optimize import minimize
 from scipy.spatial import ConvexHull
-from typing_extensions import Self, Literal
+from typing_extensions import Self
+
+from typing import Literal
 
 from .shape_core import (
     Shape,
@@ -1536,7 +1540,7 @@ class Edge(Mixin1D, Shape[TopoDS_Edge]):
         cls,
         points: list[VectorLike],
         tol: float = 1e-3,
-        smoothing: Tuple[float, float, float] | None = None,
+        smoothing: tuple[float, float, float] | None = None,
         min_deg: int = 1,
         max_deg: int = 6,
     ) -> Edge:
@@ -2302,7 +2306,7 @@ class Wire(Mixin1D, Shape[TopoDS_Wire]):
 
     @classmethod
     def combine(
-        cls, wires: Iterable[Union[Wire, Edge]], tol: float = 1e-9
+        cls, wires: Iterable[Wire | Edge], tol: float = 1e-9
     ) -> ShapeList[Wire]:
         """combine
 

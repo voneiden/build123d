@@ -50,8 +50,12 @@ import functools
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt, cos, pi
-from typing import Any, Callable, Iterable, Optional, Union, TypeVar
-from typing_extensions import Self, ParamSpec, Concatenate
+from typing import Any, Optional, Union, TypeVar
+
+from collections.abc import Callable, Iterable
+from typing_extensions import Self, ParamSpec
+
+from typing import Concatenate
 
 from build123d.build_enums import Align, Mode, Select, Unit
 from build123d.geometry import (
@@ -191,7 +195,7 @@ class Builder(ABC):
     # pylint: disable=too-many-instance-attributes
 
     # Context variable used to by Objects and Operations to link to current builder instance
-    _current: contextvars.ContextVar["Builder"] = contextvars.ContextVar(
+    _current: contextvars.ContextVar[Builder] = contextvars.ContextVar(
         "Builder._current"
     )
 
@@ -220,7 +224,7 @@ class Builder(ABC):
 
     def __init__(
         self,
-        *workplanes: Union[Face, Plane, Location],
+        *workplanes: Face | Plane | Location,
         mode: Mode = Mode.ADD,
     ):
         self.mode = mode
@@ -237,7 +241,7 @@ class Builder(ABC):
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
         self.workplanes_context = None
         self.exit_workplanes = None
-        self.obj_before: Optional[Shape] = None
+        self.obj_before: Shape | None = None
         self.to_combine: list[Shape] = []
 
     def __enter__(self):
@@ -305,12 +309,12 @@ class Builder(ABC):
         logger.info("Exiting %s", type(self).__name__)
 
     @abstractmethod
-    def _add_to_pending(self, *objects: Union[Edge, Face], face_plane: Plane = None):
+    def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane = None):
         """Integrate a sequence of objects into existing builder object"""
         return NotImplementedError  # pragma: no cover
 
     @classmethod
-    def _get_context(cls, caller: Union[Builder, str] = None, log: bool = True) -> Self:
+    def _get_context(cls, caller: Builder | str = None, log: bool = True) -> Self:
         """Return the instance of the current builder"""
         result = cls._current.get(None)
         context_name = "None" if result is None else type(result).__name__
@@ -328,7 +332,7 @@ class Builder(ABC):
 
     def _add_to_context(
         self,
-        *objects: Union[Edge, Wire, Face, Solid, Compound],
+        *objects: Edge | Wire | Face | Solid | Compound,
         faces_to_pending: bool = True,
         clean: bool = True,
         mode: Mode = Mode.ADD,
@@ -370,7 +374,7 @@ class Builder(ABC):
             num_stored = sum(len(t) for t in typed.values())
             # Generate an exception if not processing exceptions
             if len(objects) != num_stored and not sys.exc_info()[1]:
-                unsupported = set(objects) - set(v for l in typed.values() for v in l)
+                unsupported = set(objects) - {v for l in typed.values() for v in l}
                 if unsupported != {None}:
                     raise ValueError(f"{self._tag} doesn't accept {unsupported}")
 
@@ -713,7 +717,7 @@ class Builder(ABC):
             )
         return all_solids[0]
 
-    def _shapes(self, obj_type: Union[Vertex, Edge, Face, Solid] = None) -> ShapeList:
+    def _shapes(self, obj_type: Vertex | Edge | Face | Solid = None) -> ShapeList:
         """Extract Shapes"""
         obj_type = self._shape if obj_type is None else obj_type
         if obj_type == Vertex:
@@ -729,7 +733,7 @@ class Builder(ABC):
         return result
 
     def validate_inputs(
-        self, validating_class, objects: Union[Shape, Iterable[Shape]] = None
+        self, validating_class, objects: Shape | Iterable[Shape] = None
     ):
         """Validate that objects/operations and parameters apply"""
 
@@ -821,7 +825,7 @@ class LocationList:
     """
 
     # Context variable used to link to LocationList instance
-    _current: contextvars.ContextVar["LocationList"] = contextvars.ContextVar(
+    _current: contextvars.ContextVar[LocationList] = contextvars.ContextVar(
         "ContextList._current"
     )
 
@@ -931,7 +935,7 @@ class HexLocations(LocationList):
         x_count: int,
         y_count: int,
         major_radius: bool = False,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
     ):
         # pylint: disable=too-many-locals
 
@@ -1065,15 +1069,15 @@ class Locations(LocationList):
 
     def __init__(
         self,
-        *pts: Union[
-            VectorLike,
-            Vertex,
-            Location,
-            Face,
-            Plane,
-            Axis,
-            Iterable[VectorLike, Vertex, Location, Face, Plane, Axis],
-        ],
+        *pts: (
+            VectorLike |
+            Vertex |
+            Location |
+            Face |
+            Plane |
+            Axis |
+            Iterable[VectorLike, Vertex, Location, Face, Plane, Axis]
+        ),
     ):
         local_locations = []
         for point in flatten_sequence(*pts):
@@ -1155,7 +1159,7 @@ class GridLocations(LocationList):
         y_spacing: float,
         x_count: int,
         y_count: int,
-        align: Union[Align, tuple[Align, Align]] = (Align.CENTER, Align.CENTER),
+        align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
     ):
         if x_count < 1 or y_count < 1:
             raise ValueError(
@@ -1209,18 +1213,18 @@ class WorkplaneList:
     """
 
     # Context variable used to link to WorkplaneList instance
-    _current: contextvars.ContextVar["WorkplaneList"] = contextvars.ContextVar(
+    _current: contextvars.ContextVar[WorkplaneList] = contextvars.ContextVar(
         "WorkplaneList._current"
     )
 
-    def __init__(self, *workplanes: Union[Face, Plane, Location]):
+    def __init__(self, *workplanes: Face | Plane | Location):
         self._reset_tok = None
         self.workplanes = WorkplaneList._convert_to_planes(workplanes)
         self.locations_context = None
         self.plane_index = 0
 
     @staticmethod
-    def _convert_to_planes(objs: Iterable[Union[Face, Plane, Location]]) -> list[Plane]:
+    def _convert_to_planes(objs: Iterable[Face | Plane | Location]) -> list[Plane]:
         """Translate objects to planes"""
         objs = flatten_sequence(*objs)
         planes = []
@@ -1272,7 +1276,7 @@ class WorkplaneList:
         return cls._current.get(None)
 
     @classmethod
-    def localize(cls, *points: VectorLike) -> Union[list[Vector], Vector]:
+    def localize(cls, *points: VectorLike) -> list[Vector] | Vector:
         """Localize a sequence of points to the active workplane
         (only used by BuildLine where there is only one active workplane)
 

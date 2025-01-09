@@ -41,10 +41,10 @@ import numpy as np
 
 from math import degrees, pi, radians
 from typing import (
+    cast as tcast,
     Any,
-    Iterable,
     List,
-    Sequence,
+    Optional,
     Tuple,
     Union,
     overload,
@@ -52,13 +52,19 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from collections.abc import Iterable, Sequence
+
+import OCP.TopAbs as TopAbs_ShapeEnum
+
 from OCP.Bnd import Bnd_Box, Bnd_OBB
 from OCP.BRep import BRep_Tool
 from OCP.BRepBndLib import BRepBndLib
-from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace
+from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Transform
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepTools import BRepTools
-from OCP.Geom import Geom_BoundedSurface, Geom_Line, Geom_Plane
+from OCP.GCPnts import GCPnts_AbscissaPoint
+from OCP.Geom import Geom_BoundedSurface, Geom_Curve, Geom_Line, Geom_Plane
+from OCP.GeomAdaptor import GeomAdaptor_Curve
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS, GeomAPI_IntSS
 from OCP.gp import (
     gp_Ax1,
@@ -80,13 +86,12 @@ from OCP.gp import (
 from OCP.GProp import GProp_GProps
 from OCP.Quantity import Quantity_Color, Quantity_ColorRGBA
 from OCP.TopLoc import TopLoc_Location
-from OCP.TopoDS import TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
+from OCP.TopoDS import TopoDS, TopoDS_Edge, TopoDS_Face, TopoDS_Shape, TopoDS_Vertex
 
 from build123d.build_enums import Align, Align2DType, Align3DType, Intrinsic, Extrinsic
 
 if TYPE_CHECKING:  # pragma: no cover
-    from .topology import Shape
-    from .topology import Edge
+    from .topology import Edge, Face, Shape, Vertex
 
 # Create a build123d logger to distinguish these logs from application logs.
 # If the user doesn't configure logging, all build123d logs will be discarded.
@@ -587,11 +592,6 @@ class Axis(metaclass=AxisMeta):
 
     _dim = 1
 
-    @property
-    def location(self) -> Location:
-        """Return self as Location"""
-        return Location(Plane(origin=self.position, z_dir=self.direction))
-
     @overload
     def __init__(self, gp_ax1: gp_Ax1):  # pragma: no cover
         """Axis: point and direction"""
@@ -635,15 +635,22 @@ class Axis(metaclass=AxisMeta):
                 and edge.wrapped is not None
                 and isinstance(edge.wrapped, TopoDS_Edge)
             ):
-                origin: Vector = edge.position_at(0)
-                direction: Vector = edge.tangent_at(0)
+                # Extract the start point and tangent
+                topods_edge: TopoDS_Edge = edge.wrapped  # type: ignore[annotation-unchecked]
+                curve = BRep_Tool.Curve_s(topods_edge, float(), float())
+                param_min, param_max = BRep_Tool.Range_s(topods_edge)
+                origin_pnt = gp_Pnt()
+                tangent_vec = gp_Vec()
+                curve.D1(param_min, origin_pnt, tangent_vec)
+                origin = Vector(origin_pnt)
+                direction = Vector(gp_Dir(tangent_vec))
             else:
                 raise ValueError(f"Invalid argument {edge}")
 
         if gp_ax1 is not None:
             if not isinstance(gp_ax1, gp_Ax1):
                 raise ValueError(f"Invalid Axis parameter {gp_ax1}")
-            self.wrapped: gp_Ax1 = gp_ax1
+            self.wrapped: gp_Ax1 = gp_ax1  # type: ignore[annotation-unchecked]
         else:
             try:
                 origin_vector = Vector(origin)
@@ -666,6 +673,11 @@ class Axis(metaclass=AxisMeta):
             self.wrapped.Direction().Y(),
             self.wrapped.Direction().Z(),
         )  #: Axis direction
+
+    @property
+    def location(self) -> Location:
+        """Return self as Location"""
+        return Location(Plane(origin=self.position, z_dir=self.direction))
 
     def __copy__(self) -> Axis:
         """Return copy of self"""
@@ -690,7 +702,11 @@ class Axis(metaclass=AxisMeta):
 
     def located(self, new_location: Location):
         """relocates self to a new location possibly changing position and direction"""
-        new_gp_ax1 = self.wrapped.Transformed(new_location.wrapped.Transformation())
+        if self.wrapped is None:
+            raise ValueError("Can't located empty Axis")
+        top_location: TopLoc_Location = new_location.wrapped  # type: ignore[has-type]
+        self_gp_ax1: gp_Ax1 = self.wrapped
+        new_gp_ax1: gp_Ax1 = self_gp_ax1.Transformed(top_location.Transformation())
         return Axis(new_gp_ax1)
 
     def to_plane(self) -> Plane:
@@ -789,7 +805,9 @@ class Axis(metaclass=AxisMeta):
         """Flip direction operator -"""
         return self.reverse()
 
-    def __and__(self: Plane, other: Axis | Location | Plane | VectorLike | Shape):
+    def __and__(
+        self, other: Axis | Location | Plane | VectorLike | Shape
+    ) -> Vector | Location | Axis | None:
         """intersect vector with other &"""
         return self.intersect(other)
 
@@ -847,7 +865,7 @@ class Axis(metaclass=AxisMeta):
 
         elif vector is not None:
             # Create a vector from the origin to the point
-            vec_to_point: Vector = vector - self.position
+            vec_to_point = vector - self.position
 
             # Project the vector onto the direction of the axis
             projected_length = vec_to_point.dot(self.direction)
@@ -876,12 +894,12 @@ class BoundBox:
     """A BoundingBox for a Shape"""
 
     def __init__(self, bounding_box: Bnd_Box) -> None:
+
         if bounding_box.IsVoid():
-            self.wrapped = None
             x_min, y_min, z_min, x_max, y_max, z_max = (0,) * 6
         else:
-            self.wrapped: Bnd_Box = bounding_box
             x_min, y_min, z_min, x_max, y_max, z_max = bounding_box.Get()
+        self.wrapped = None if bounding_box.IsVoid() else bounding_box
         self.min = Vector(x_min, y_min, z_min)  #: location of minimum corner
         self.max = Vector(x_max, y_max, z_max)  #: location of maximum corner
         self.size = Vector(x_max - x_min, y_max - y_min, z_max - z_min)  #: overall size
@@ -907,7 +925,7 @@ class BoundBox:
     def add(
         self,
         obj: tuple[float, float, float] | Vector | BoundBox,
-        tol: float = None,
+        tol: float | None = None,
     ) -> BoundBox:
         """Returns a modified (expanded) bounding box
 
@@ -984,7 +1002,7 @@ class BoundBox:
     def from_topo_ds(
         cls,
         shape: TopoDS_Shape,
-        tolerance: float = None,
+        tolerance: float | None = None,
         optimal: bool = True,
         oriented: bool = False,
     ) -> BoundBox:
@@ -1241,79 +1259,6 @@ class Location:
         Extrinsic.ZYZ: gp_EulerSequence.gp_Extrinsic_ZYZ,
     }
 
-    @property
-    def position(self) -> Vector:
-        """Extract Position component of self
-
-        Returns:
-          Vector: Position part of Location
-
-        """
-        return Vector(self.to_tuple()[0])
-
-    @position.setter
-    def position(self, value: VectorLike):
-        """Set the position component of this Location
-
-        Args:
-            value (VectorLike): New position
-        """
-        trsf_position = gp_Trsf()
-        trsf_position.SetTranslationPart(Vector(value).wrapped)
-        trsf_orientation = gp_Trsf()
-        trsf_orientation.SetRotation(self.wrapped.Transformation().GetRotation())
-        self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
-
-    @property
-    def orientation(self) -> Vector:
-        """Extract orientation/rotation component of self
-
-        Returns:
-          Vector: orientation part of Location
-
-        """
-        return Vector(self.to_tuple()[1])
-
-    @orientation.setter
-    def orientation(self, rotation: VectorLike):
-        """Set the orientation component of this Location
-
-        Args:
-            rotation (VectorLike): Intrinsic XYZ angles in degrees
-        """
-
-        ordering = Intrinsic.XYZ
-
-        position_xyz = self.wrapped.Transformation().TranslationPart()
-        trsf_position = gp_Trsf()
-        trsf_position.SetTranslationPart(
-            gp_Vec(position_xyz.X(), position_xyz.Y(), position_xyz.Z())
-        )
-        rotation = [radians(a) for a in rotation]
-        quaternion = gp_Quaternion()
-        quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
-        trsf_orientation = gp_Trsf()
-        trsf_orientation.SetRotation(quaternion)
-        self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
-
-    @property
-    def x_axis(self) -> Axis:
-        """Default X axis when used as a plane"""
-        plane = Plane(self)
-        return Axis(plane.origin, plane.x_dir)
-
-    @property
-    def y_axis(self) -> Axis:
-        """Default Y axis when used as a plane"""
-        plane = Plane(self)
-        return Axis(plane.origin, plane.y_dir)
-
-    @property
-    def z_axis(self) -> Axis:
-        """Default Z axis when used as a plane"""
-        plane = Plane(self)
-        return Axis(plane.origin, plane.z_dir)
-
     @overload
     def __init__(self):  # pragma: no cover
         """Empty location with not rotation or translation with respect to the original location."""
@@ -1329,7 +1274,7 @@ class Location:
 
     @overload
     def __init__(
-        self, translation: VectorLike, rotation: RotationLike = None
+        self, translation: VectorLike, rotation: RotationLike | None = None
     ):  # pragma: no cover
         """Location with translation with respect to the original location.
         If rotation is not None then the location includes the rotation (see also Rotation class)
@@ -1458,6 +1403,81 @@ class Location:
             transform.SetTranslationPart(Vector(translation).wrapped)
         self.wrapped = TopLoc_Location(transform)
 
+    @property
+    def position(self) -> Vector:
+        """Extract Position component of self
+
+        Returns:
+          Vector: Position part of Location
+
+        """
+        return Vector(self.to_tuple()[0])
+
+    @position.setter
+    def position(self, value: VectorLike):
+        """Set the position component of this Location
+
+        Args:
+            value (VectorLike): New position
+        """
+        if self.wrapped is None:
+            raise ValueError("Can't determine position of empty Location")
+        trsf_position = gp_Trsf()
+        trsf_position.SetTranslationPart(Vector(value).wrapped)
+        trsf_orientation = gp_Trsf()
+        trsf_orientation.SetRotation(self.wrapped.Transformation().GetRotation())
+        self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
+
+    @property
+    def orientation(self) -> Vector:
+        """Extract orientation/rotation component of self
+
+        Returns:
+          Vector: orientation part of Location
+
+        """
+        return Vector(self.to_tuple()[1])
+
+    @orientation.setter
+    def orientation(self, rotation: VectorLike):
+        """Set the orientation component of this Location
+
+        Args:
+            rotation (VectorLike): Intrinsic XYZ angles in degrees
+        """
+
+        ordering = Intrinsic.XYZ
+
+        position_xyz = self.wrapped.Transformation().TranslationPart()
+        trsf_position = gp_Trsf()
+        trsf_position.SetTranslationPart(
+            gp_Vec(position_xyz.X(), position_xyz.Y(), position_xyz.Z())
+        )
+        rotation = [radians(a) for a in rotation]
+        quaternion = gp_Quaternion()
+        quaternion.SetEulerAngles(self._rot_order_dict[ordering], *rotation)
+        trsf_orientation = gp_Trsf()
+        trsf_orientation.SetRotation(quaternion)
+        self.wrapped = TopLoc_Location(trsf_position * trsf_orientation)
+
+    @property
+    def x_axis(self) -> Axis:
+        """Default X axis when used as a plane"""
+        plane = Plane(self)
+        return Axis(plane.origin, plane.x_dir)
+
+    @property
+    def y_axis(self) -> Axis:
+        """Default Y axis when used as a plane"""
+        plane = Plane(self)
+        return Axis(plane.origin, plane.y_dir)
+
+    @property
+    def z_axis(self) -> Axis:
+        """Default Z axis when used as a plane"""
+        plane = Plane(self)
+        return Axis(plane.origin, plane.z_dir)
+
     def inverse(self) -> Location:
         """Inverted location"""
         return Location(self.wrapped.Inverted())
@@ -1470,21 +1490,51 @@ class Location:
         """Lib/copy.py deep copy"""
         return Location(self.wrapped.Transformation())
 
-    T = TypeVar("T", bound=Union["Location", "Shape"])
-
-    def __mul__(self, other: T) -> T:
+    def __mul__(
+        self, other: Shape | Location | Iterable[Location]
+    ) -> Shape | Location | list[Location]:
         """Combine locations"""
-        if hasattr(other, "wrapped") and not isinstance(
-            other.wrapped, TopLoc_Location
-        ):  # Shape
-            result = other.moved(self)
-        elif isinstance(other, Iterable) and all(
-            isinstance(o, Location) for o in other
-        ):
-            result = [Location(self.wrapped * loc.wrapped) for loc in other]
-        else:
-            result = Location(self.wrapped * other.wrapped)
-        return result
+        if self.wrapped is None:
+            raise ValueError("Cannot move a shape at an empty location")
+
+        # other is a Shape
+        if hasattr(other, "wrapped") and isinstance(other.wrapped, TopoDS_Shape):
+            # result = other.moved(self)
+            downcast_LUT = {
+                TopAbs_ShapeEnum.TopAbs_VERTEX: TopoDS.Vertex_s,
+                TopAbs_ShapeEnum.TopAbs_EDGE: TopoDS.Edge_s,
+                TopAbs_ShapeEnum.TopAbs_WIRE: TopoDS.Wire_s,
+                TopAbs_ShapeEnum.TopAbs_FACE: TopoDS.Face_s,
+                TopAbs_ShapeEnum.TopAbs_SHELL: TopoDS.Shell_s,
+                TopAbs_ShapeEnum.TopAbs_SOLID: TopoDS.Solid_s,
+                TopAbs_ShapeEnum.TopAbs_COMPOUND: TopoDS.Compound_s,
+            }
+            assert other.wrapped is not None
+            try:
+                f_downcast = downcast_LUT[other.wrapped.ShapeType()]
+            except KeyError as exc:
+                raise ValueError(f"Unknown object type {other}") from exc
+
+            result: Shape = copy.deepcopy(other, None)  # type: ignore[arg-type]
+            result.wrapped = f_downcast(other.wrapped.Moved(self.wrapped))
+            return result
+
+        # other is a Location
+        if isinstance(other, Location):
+            if other.wrapped is None:
+                raise ValueError("Can't multiply by empty location")
+            return Location(self.wrapped * other.wrapped)
+
+        # other is a list of Locations
+        if isinstance(other, Iterable):
+            others = list(other)
+            if not all(isinstance(o, Location) for o in others):
+                raise ValueError("other must be a list of Locations")
+            if any(o.wrapped is None for o in others):
+                raise ValueError("Can't multiple by empty Locations")
+            return [Location(self.wrapped * loc.wrapped) for loc in others]
+
+        raise ValueError(f"Invalid input {other}")
 
     def __pow__(self, exponent: int) -> Location:
         return Location(self.wrapped.Powered(exponent))
@@ -1513,7 +1563,9 @@ class Location:
         """Flip the orientation without changing the position operator -"""
         return Location(-Plane(self))
 
-    def __and__(self: Plane, other: Axis | Location | Plane | VectorLike | Shape):
+    def __and__(
+        self, other: Axis | Location | Plane | VectorLike | Shape
+    ) -> Vector | Location | None:
         """intersect axis with other &"""
         return self.intersect(other)
 
@@ -1528,12 +1580,12 @@ class Location:
         trans = transformation.TranslationPart()
         rot = transformation.GetRotation()
 
-        rv_trans = (trans.X(), trans.Y(), trans.Z())
-        rv_rot = [
+        rv_trans: tuple[float, float, float] = (trans.X(), trans.Y(), trans.Z())
+        rv_rot: tuple[float, float, float] = tuple(
             degrees(a) for a in rot.GetEulerAngles(gp_EulerSequence.gp_Intrinsic_XYZ)
-        ]
+        )  # type: ignore[assignment]
 
-        return rv_trans, tuple(rv_rot)
+        return rv_trans, rv_rot
 
     def __repr__(self):
         """To String
@@ -1543,8 +1595,8 @@ class Location:
         Returns:
             Location as String
         """
-        position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
+        position_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[0])
+        orientation_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[1])
         return f"(p=({position_str}), o=({orientation_str}))"
 
     def __str__(self):
@@ -1555,8 +1607,8 @@ class Location:
         Returns:
             Location as String
         """
-        position_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[0]))
-        orientation_str = ", ".join((f"{v:.2f}" for v in self.to_tuple()[1]))
+        position_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[0])
+        orientation_str = ", ".join(f"{v:.2f}" for v in self.to_tuple()[1])
         return f"Location: (position=({position_str}), orientation=({orientation_str}))"
 
     @overload
@@ -1652,7 +1704,7 @@ class Rotation(Location):
     def __init__(
         self,
         rotation: RotationLike,
-        ordering: Extrinsic | Intrinsic == Intrinsic.XYZ,
+        ordering: Extrinsic | Intrinsic == Intrinsic.XYZ,  # type: ignore[valid-type]
     ):
         """Subclass of Location used only for object rotation
         ordering is for order of rotations in Intrinsic or Extrinsic enums"""
@@ -1767,28 +1819,45 @@ class Matrix:
     """
 
     @overload
-    def __init__(self) -> None:  # pragma: no cover
+    def __init__(self):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, matrix: gp_GTrsf | gp_Trsf) -> None:  # pragma: no cover
+    def __init__(self, trsf: gp_GTrsf | gp_Trsf):  # pragma: no cover
         ...
 
     @overload
-    def __init__(self, matrix: Sequence[Sequence[float]]) -> None:  # pragma: no cover
+    def __init__(self, matrix: Sequence[Sequence[float]]):  # pragma: no cover
         ...
 
-    def __init__(self, matrix=None):
-        if matrix is None:
-            self.wrapped = gp_GTrsf()
-        elif isinstance(matrix, gp_GTrsf):
-            self.wrapped = matrix
-        elif isinstance(matrix, gp_Trsf):
-            self.wrapped = gp_GTrsf(matrix)
-        elif isinstance(matrix, (list, tuple)):
+    def __init__(self, *args, **kwargs):
+        default_matrix = None
+        default_trsf = gp_GTrsf()
+
+        # Handle args
+        if args:
+            if isinstance(args[0], gp_GTrsf):
+                default_trsf = args[0]
+            elif isinstance(args[0], gp_Trsf):
+                default_trsf = gp_GTrsf(args[0])
+            elif isinstance(args[0], Sequence):
+                default_matrix = args[0]
+            else:
+                raise TypeError(f"{args[0]} is of an unexpected type")
+
+        # Handle kwargs
+        trsf = kwargs.pop("trsf", default_trsf)
+        matrix = kwargs.pop("matrix", default_matrix)
+
+        # Handle unexpected kwargs
+        if kwargs:
+            raise ValueError(f"Unexpected argument(s): {', '.join(kwargs.keys())}")
+
+        # Validate matrix
+        if matrix is not None:
             # Validate matrix size & 4x4 last row value
             valid_sizes = all(
-                (isinstance(row, (list, tuple)) and (len(row) == 4)) for row in matrix
+                (isinstance(row, Sequence) and (len(row) == 4)) for row in matrix
             ) and len(matrix) in (3, 4)
             if not valid_sizes:
                 raise TypeError(
@@ -1800,13 +1869,13 @@ class Matrix:
                 )
 
             # Assign values to matrix
-            self.wrapped = gp_GTrsf()
             for i, row in enumerate(matrix[:3]):
                 for j, element in enumerate(row):
-                    self.wrapped.SetValue(i + 1, j + 1, element)
+                    if not isinstance(element, (int, float)):
+                        raise TypeError("Only float or int are valid in the matrix")
+                    trsf.SetValue(i + 1, j + 1, element)
 
-        else:
-            raise TypeError(f"Invalid param to matrix constructor: {matrix}")
+        self.wrapped = trsf  #: the OCP transformation function
 
     def rotate(self, axis: Axis, angle: float):
         """General rotate about axis"""
@@ -2026,9 +2095,7 @@ class Plane(metaclass=PlaneMeta):
         """Return a plane from a OCCT gp_pln"""
 
     @overload
-    def __init__(
-        self, face: "Face", x_dir: VectorLike | None = None
-    ):  # pragma: no cover
+    def __init__(self, face: Face, x_dir: VectorLike | None = None):  # pragma: no cover
         """Return a plane extending the face.
         Note: for non planar face this will return the underlying work plane"""
 
@@ -2040,7 +2107,7 @@ class Plane(metaclass=PlaneMeta):
     def __init__(
         self,
         origin: VectorLike,
-        x_dir: VectorLike = None,
+        x_dir: VectorLike | None = None,
         z_dir: VectorLike = (0, 0, 1),
     ):  # pragma: no cover
         """Return a new plane at origin with x_dir and z_dir"""
@@ -2150,9 +2217,9 @@ class Plane(metaclass=PlaneMeta):
             self.wrapped = gp_Pln(
                 gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
             )
-        self.local_coord_system: gp_Ax3 = None
-        self.reverse_transform: Matrix = None
-        self.forward_transform: Matrix = None
+        self.local_coord_system = None  #: gp_Ax3 | None
+        self.reverse_transform = None  #: Matrix | None
+        self.forward_transform = None  #: Matrix | None
         self.origin = self._origin  # set origin to calculate transformations
 
     def offset(self, amount: float) -> Plane:
@@ -2193,22 +2260,20 @@ class Plane(metaclass=PlaneMeta):
 
     def __mul__(self, other: Location | Shape) -> Plane | list[Plane] | Shape:
         if isinstance(other, Location):
-            result = Plane(self.location * other)
-        elif (  # LocationList
+            return Plane(self.location * other)
+        if (  # LocationList
             hasattr(other, "local_locations") and hasattr(other, "location_index")
         ) or (  # tuple of locations
             isinstance(other, (list, tuple))
             and all([isinstance(o, Location) for o in other])
         ):
-            result = [self * loc for loc in other]
-        elif hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
-            result = self.location * other
+            return [self * loc for loc in other]
+        if hasattr(other, "wrapped") and not isinstance(other, Vector):  # Shape
+            return self.location * other
 
-        else:
-            raise TypeError(
-                "Planes can only be multiplied with Locations or Shapes to relocate them"
-            )
-        return result
+        raise TypeError(
+            "Planes can only be multiplied with Locations or Shapes to relocate them"
+        )
 
     def __and__(self: Plane, other: Axis | Location | Plane | VectorLike | Shape):
         """intersect plane with other &"""
@@ -2222,9 +2287,9 @@ class Plane(metaclass=PlaneMeta):
         Returns:
             Plane as String
         """
-        origin_str = ", ".join((f"{v:.2f}" for v in self._origin.to_tuple()))
-        x_dir_str = ", ".join((f"{v:.2f}" for v in self.x_dir.to_tuple()))
-        z_dir_str = ", ".join((f"{v:.2f}" for v in self.z_dir.to_tuple()))
+        origin_str = ", ".join(f"{v:.2f}" for v in self._origin.to_tuple())
+        x_dir_str = ", ".join(f"{v:.2f}" for v in self.x_dir.to_tuple())
+        z_dir_str = ", ".join(f"{v:.2f}" for v in self.z_dir.to_tuple())
         return f"Plane(o=({origin_str}), x=({x_dir_str}), z=({z_dir_str}))"
 
     def reverse(self) -> Plane:
@@ -2245,7 +2310,7 @@ class Plane(metaclass=PlaneMeta):
             gp_Ax3(self._origin.to_pnt(), self.z_dir.to_dir(), self.x_dir.to_dir())
         )
 
-    def shift_origin(self, locator: Axis | VectorLike | "Vertex") -> Plane:
+    def shift_origin(self, locator: Axis | VectorLike | Vertex) -> Plane:
         """shift plane origin
 
         Creates a new plane with the origin moved within the plane to the point of intersection
@@ -2264,8 +2329,11 @@ class Plane(metaclass=PlaneMeta):
             Plane: plane with new origin
 
         """
-        if type(locator).__name__ == "Vertex":
-            new_origin = tuple(locator)
+        if hasattr(locator, "wrapped") and locator.wrapped is None:
+            raise ValueError("Can't shift origin to empty locator")
+        if hasattr(locator, "wrapped") and isinstance(locator.wrapped, TopoDS_Vertex):
+            geom_point = BRep_Tool.Pnt_s(locator.wrapped)
+            new_origin = Vector(geom_point.X(), geom_point.Y(), geom_point.Z())
             if not self.contains(new_origin):
                 raise ValueError(f"{locator} is not located within plane")
         elif isinstance(locator, (tuple, Vector)):
@@ -2273,9 +2341,10 @@ class Plane(metaclass=PlaneMeta):
             if not self.contains(locator):
                 raise ValueError(f"{locator} is not located within plane")
         elif isinstance(locator, Axis):
-            new_origin = self.intersect(locator)
-            if new_origin is None:
+            intersection = self.intersect(locator)
+            if not isinstance(intersection, Vector):
                 raise ValueError(f"{locator} doesn't intersect the plane")
+            new_origin = intersection
         else:
             raise TypeError(f"Invalid locate type: {type(locator)}")
         return Plane(origin=new_origin, x_dir=self.x_dir, z_dir=self.z_dir)
@@ -2283,7 +2352,7 @@ class Plane(metaclass=PlaneMeta):
     def rotated(
         self,
         rotation: VectorLike = (0, 0, 0),
-        ordering: Extrinsic | Intrinsic = None,
+        ordering: Extrinsic | Intrinsic | None = None,
     ) -> Plane:
         """Returns a copy of this plane, rotated about the specified axes
 
@@ -2358,9 +2427,9 @@ class Plane(metaclass=PlaneMeta):
         inverse_t.SetTransformation(local_coord_system, global_coord_system)
         inverse.wrapped = gp_GTrsf(inverse_t)
 
-        self.local_coord_system: gp_Ax3 = local_coord_system
-        self.reverse_transform: Matrix = inverse
-        self.forward_transform: Matrix = forward
+        self.local_coord_system = local_coord_system  #: gp_Ax3
+        self.reverse_transform = inverse  #: Matrix
+        self.forward_transform = forward  #: Matrix
 
     @property
     def location(self) -> Location:
@@ -2396,8 +2465,8 @@ class Plane(metaclass=PlaneMeta):
         transform_matrix = self.forward_transform if to_from else self.reverse_transform
 
         if isinstance(obj, (tuple, Vector)):
-            return_value = Vector(obj).transform(transform_matrix)
-        elif isinstance(obj, BoundBox):
+            return Vector(obj).transform(transform_matrix)
+        if isinstance(obj, BoundBox):
             global_bottom_left = Vector(obj.min.X, obj.min.Y, obj.min.Z)
             global_top_right = Vector(obj.max.X, obj.max.Y, obj.max.Z)
             local_bottom_left = global_bottom_left.transform(transform_matrix)
@@ -2406,14 +2475,36 @@ class Plane(metaclass=PlaneMeta):
                 gp_Pnt(*local_bottom_left.to_tuple()),
                 gp_Pnt(*local_top_right.to_tuple()),
             )
-            return_value = BoundBox(local_bbox)
-        elif hasattr(obj, "wrapped"):  # Shapes
-            return_value = obj.transform_shape(transform_matrix)
-        else:
-            raise ValueError(
-                f"Unable to repositioned type {type(obj)} with respect to local coordinates"
+            return BoundBox(local_bbox)
+        if hasattr(obj, "wrapped") and obj.wrapped is None:  # Empty shape
+            raise ValueError("Cant's reposition empty object")
+        if hasattr(obj, "wrapped") and isinstance(obj.wrapped, TopoDS_Shape):  # Shapes
+            # return_value = obj.transform_shape(transform_matrix)
+            downcast_LUT = {
+                TopAbs_ShapeEnum.TopAbs_VERTEX: TopoDS.Vertex_s,
+                TopAbs_ShapeEnum.TopAbs_EDGE: TopoDS.Edge_s,
+                TopAbs_ShapeEnum.TopAbs_WIRE: TopoDS.Wire_s,
+                TopAbs_ShapeEnum.TopAbs_FACE: TopoDS.Face_s,
+                TopAbs_ShapeEnum.TopAbs_SHELL: TopoDS.Shell_s,
+                TopAbs_ShapeEnum.TopAbs_SOLID: TopoDS.Solid_s,
+                TopAbs_ShapeEnum.TopAbs_COMPOUND: TopoDS.Compound_s,
+            }
+            assert obj.wrapped is not None
+            try:
+                f_downcast = downcast_LUT[obj.wrapped.ShapeType()]
+            except KeyError as exc:
+                raise ValueError(f"Unknown object type {obj}") from exc
+
+            new_shape: Shape = copy.deepcopy(obj, None)  # type: ignore[arg-type]
+            new_shape.wrapped = f_downcast(
+                BRepBuilderAPI_Transform(
+                    obj.wrapped, transform_matrix.wrapped.Trsf()
+                ).Shape()
             )
-        return return_value
+            return new_shape
+        raise ValueError(
+            f"Unable to repositioned type {type(obj)} with respect to local coordinates"
+        )
 
     def to_local_coords(self, obj: VectorLike | Any | BoundBox):
         """Reposition the object relative to this plane

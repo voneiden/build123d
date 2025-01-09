@@ -216,7 +216,7 @@ def display(shape: Any) -> Javascript:
     Returns:
         Javascript: code
     """
-    payload: List[Dict[str, Any]] = []
+    payload: list[dict[str, Any]] = []
 
     if not hasattr(shape, "wrapped"):  # Is a "Shape"
         raise ValueError(f"Type {type(shape)} is not supported")

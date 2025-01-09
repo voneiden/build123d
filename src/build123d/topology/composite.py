@@ -59,7 +59,9 @@ import os
 import sys
 import warnings
 from itertools import combinations
-from typing import Iterable, Iterator, Sequence, Type, Union
+from typing import Type, Union
+
+from collections.abc import Iterable, Iterator, Sequence
 
 import OCP.TopAbs as ta
 from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
@@ -238,7 +240,7 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
         align: Align | tuple[Align, Align] = (Align.CENTER, Align.CENTER),
         position_on_path: float = 0.0,
         text_path: Edge | Wire | None = None,
-    ) -> "Compound":
+    ) -> Compound:
         """2D Text that optionally follows a path.
 
         The text that is created can be combined as with other sketch features by specifying
@@ -609,14 +611,14 @@ class Compound(Mixin3D, Shape[TopoDS_Compound]):
     def get_type(
         self,
         obj_type: (
-            Type[Vertex]
-            | Type[Edge]
-            | Type[Face]
-            | Type[Shell]
-            | Type[Solid]
-            | Type[Wire]
+            type[Vertex]
+            | type[Edge]
+            | type[Face]
+            | type[Shell]
+            | type[Solid]
+            | type[Wire]
         ),
-    ) -> list[Union[Vertex, Edge, Face, Shell, Solid, Wire]]:
+    ) -> list[Vertex | Edge | Face | Shell | Solid | Wire]:
         """get_type
 
         Extract the objects of the given type from a Compound. Note that this

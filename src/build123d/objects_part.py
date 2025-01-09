@@ -55,9 +55,9 @@ class BasePartObject(Part):
 
     def __init__(
         self,
-        part: Union[Part, Solid],
+        part: Part | Solid,
         rotation: RotationLike = (0, 0, 0),
-        align: Union[Align, tuple[Align, Align, Align]] = None,
+        align: Align | tuple[Align, Align, Align] = None,
         mode: Mode = Mode.ADD,
     ):
         if align is not None:
@@ -124,7 +124,7 @@ class Box(BasePartObject):
         width: float,
         height: float,
         rotation: RotationLike = (0, 0, 0),
-        align: Union[Align, tuple[Align, Align, Align]] = (
+        align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
             Align.CENTER,
@@ -170,7 +170,7 @@ class Cone(BasePartObject):
         height: float,
         arc_size: float = 360,
         rotation: RotationLike = (0, 0, 0),
-        align: Union[Align, tuple[Align, Align, Align]] = (
+        align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
             Align.CENTER,
@@ -322,7 +322,7 @@ class Cylinder(BasePartObject):
         height: float,
         arc_size: float = 360,
         rotation: RotationLike = (0, 0, 0),
-        align: Union[Align, tuple[Align, Align, Align]] = (
+        align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
             Align.CENTER,
@@ -419,7 +419,7 @@ class Sphere(BasePartObject):
         arc_size2: float = 90,
         arc_size3: float = 360,
         rotation: RotationLike = (0, 0, 0),
-        align: Union[Align, tuple[Align, Align, Align]] = (
+        align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
             Align.CENTER,
@@ -473,7 +473,7 @@ class Torus(BasePartObject):
         minor_end_angle: float = 360,
         major_angle: float = 360,
         rotation: RotationLike = (0, 0, 0),
-        align: Union[Align, tuple[Align, Align, Align]] = (
+        align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
             Align.CENTER,
@@ -533,7 +533,7 @@ class Wedge(BasePartObject):
         xmax: float,
         zmax: float,
         rotation: RotationLike = (0, 0, 0),
-        align: Union[Align, tuple[Align, Align, Align]] = (
+        align: Align | tuple[Align, Align, Align] = (
             Align.CENTER,
             Align.CENTER,
             Align.CENTER,
