@@ -71,6 +71,7 @@ from build123d.topology import (
     Curve,
     Edge,
     Face,
+    Joint,
     Part,
     Shape,
     ShapeList,
@@ -314,7 +315,9 @@ class Builder(ABC):
         return NotImplementedError  # pragma: no cover
 
     @classmethod
-    def _get_context(cls, caller: Builder | str = None, log: bool = True) -> Self:
+    def _get_context(
+        cls, caller: Builder | Shape | Joint | str | None = None, log: bool = True
+    ) -> Self:
         """Return the instance of the current builder"""
         result = cls._current.get(None)
         context_name = "None" if result is None else type(result).__name__
@@ -1070,13 +1073,13 @@ class Locations(LocationList):
     def __init__(
         self,
         *pts: (
-            VectorLike |
-            Vertex |
-            Location |
-            Face |
-            Plane |
-            Axis |
-            Iterable[VectorLike, Vertex, Location, Face, Plane, Axis]
+            VectorLike
+            | Vertex
+            | Location
+            | Face
+            | Plane
+            | Axis
+            | Iterable[VectorLike, Vertex, Location, Face, Plane, Axis]
         ),
     ):
         local_locations = []

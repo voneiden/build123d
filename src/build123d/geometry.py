@@ -1490,6 +1490,15 @@ class Location:
         """Lib/copy.py deep copy"""
         return Location(self.wrapped.Transformation())
 
+    @overload
+    def __mul__(self, other: Shape) -> Shape: ...
+
+    @overload
+    def __mul__(self, other: Location) -> Location: ...
+
+    @overload
+    def __mul__(self, other: Iterable[Location]) -> list[Location]: ...
+
     def __mul__(
         self, other: Shape | Location | Iterable[Location]
     ) -> Shape | Location | list[Location]:

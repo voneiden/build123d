@@ -164,7 +164,9 @@ if TYPE_CHECKING:  # pragma: no cover
     from .one_d import Edge, Wire  # pylint: disable=R0801
     from .two_d import Face, Shell  # pylint: disable=R0801
     from .three_d import Solid  # pylint: disable=R0801
-    from .composite import Compound, Curve, Sketch, Part  # pylint: disable=R0801
+    from .composite import Compound  # pylint: disable=R0801
+    from build123d.build_part import BuildPart  # pylint: disable=R0801
+
 HASH_CODE_MAX = 2147483647
 Shapes = Literal["Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"]
 TrimmingTool = Union[Plane, "Shell", "Face"]
@@ -679,7 +681,7 @@ class Shape(NodeMixin, Generic[TOPODS]):
         entity_type: Literal[
             "Vertex", "Edge", "Wire", "Face", "Shell", "Solid", "Compound"
         ],
-    ) -> Shape:
+    ) -> Shape | None:
         """Helper to extract a single entity of a specific type from a shape,
         with a warning if count != 1."""
         shape_list = Shape.get_shape_list(shape, entity_type)
@@ -2781,7 +2783,7 @@ class Joint(ABC):
 
     # ---- Constructor ----
 
-    def __init__(self, label: str, parent: Solid | Compound):
+    def __init__(self, label: str, parent: BuildPart | Solid | Compound):
         self.label = label
         self.parent = parent
         self.connected_to: Joint | None = None
@@ -2801,11 +2803,11 @@ class Joint(ABC):
     # ---- Instance Methods ----
 
     @abstractmethod
-    def connect_to(self, other: Joint):
+    def connect_to(self, *args, **kwargs):
         """All derived classes must provide a connect_to method"""
 
     @abstractmethod
-    def relative_to(self, other: Joint) -> Location:
+    def relative_to(self, *args, **kwargs) -> Location:
         """Return relative location to another joint"""
 
     def _connect_to(self, other: Joint, **kwargs):  # pragma: no cover
