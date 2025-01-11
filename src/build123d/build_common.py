@@ -50,7 +50,7 @@ import functools
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt, cos, pi
-from typing import Any, Type, TypeVar
+from typing import Any, overload, Type, TypeVar
 
 from collections.abc import Callable, Iterable
 from typing_extensions import Self
@@ -1295,8 +1295,16 @@ class WorkplaneList:
         """Return the instance of the current ContextList"""
         return cls._current.get(None)
 
+    @overload
     @classmethod
-    def localize(cls, *points: VectorLike) -> list[Vector] | Vector:
+    def localize(cls, points: VectorLike) -> Vector: ...
+
+    @overload
+    @classmethod
+    def localize(cls, *points: VectorLike) -> list[Vector]: ...
+
+    @classmethod
+    def localize(cls, *points: VectorLike):
         """Localize a sequence of points to the active workplane
         (only used by BuildLine where there is only one active workplane)
 
