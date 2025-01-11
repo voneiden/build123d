@@ -136,10 +136,10 @@ def _is_point(obj):
 T = TypeVar("T", Any, list[Any])
 
 
-def flatten_sequence(*obj: T) -> list[Any]:
+def flatten_sequence(*obj: T) -> ShapeList[Any]:
     """Convert a sequence of object potentially containing iterables into a flat list"""
 
-    flat_list = []
+    flat_list = ShapeList()
     for item in obj:
         # Note: an Iterable can't be used here as it will match with Vector & Vertex
         # and break them into a list of floats.
@@ -316,10 +316,14 @@ class Builder(ABC):
         """Integrate a sequence of objects into existing builder object"""
         return NotImplementedError  # pragma: no cover
 
+    T = TypeVar("T", bound="Builder")
+
     @classmethod
     def _get_context(
-        cls, caller: Builder | Shape | Joint | str | None = None, log: bool = True
-    ) -> Builder | None:
+        cls: Type[T],
+        caller: Builder | Shape | Joint | str | None = None,
+        log: bool = True,
+    ) -> T | None:
         """Return the instance of the current builder"""
         result = cls._current.get(None)
         context_name = "None" if result is None else type(result).__name__
@@ -818,7 +822,7 @@ class Builder(ABC):
 
 
 def validate_inputs(
-    context: Builder, validating_class, objects: Iterable[Shape] | None = None
+    context: Builder | None, validating_class, objects: Iterable[Shape] | None = None
 ):
     """A function to wrap the method when used outside of a Builder context"""
     if context is None:
