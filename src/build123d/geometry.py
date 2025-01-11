@@ -40,17 +40,7 @@ import logging
 import numpy as np
 
 from math import degrees, pi, radians
-from typing import (
-    cast as tcast,
-    Any,
-    List,
-    Optional,
-    Tuple,
-    Union,
-    overload,
-    TypeVar,
-    TYPE_CHECKING,
-)
+from typing import Any, overload, TypeAlias, TYPE_CHECKING
 
 from collections.abc import Iterable, Sequence
 
@@ -62,9 +52,7 @@ from OCP.BRepBndLib import BRepBndLib
 from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeFace, BRepBuilderAPI_Transform
 from OCP.BRepGProp import BRepGProp, BRepGProp_Face  # used for mass calculation
 from OCP.BRepTools import BRepTools
-from OCP.GCPnts import GCPnts_AbscissaPoint
-from OCP.Geom import Geom_BoundedSurface, Geom_Curve, Geom_Line, Geom_Plane
-from OCP.GeomAdaptor import GeomAdaptor_Curve
+from OCP.Geom import Geom_BoundedSurface, Geom_Line, Geom_Plane
 from OCP.GeomAPI import GeomAPI_ProjectPointOnSurf, GeomAPI_IntCS, GeomAPI_IntSS
 from OCP.gp import (
     gp_Ax1,
@@ -549,10 +537,17 @@ class Vector:
             return shape.intersect(self)
 
 
-#:TypeVar("VectorLike"): Tuple of float or Vector defining a position in space
-VectorLike = Union[
-    Vector, tuple[float, float], tuple[float, float, float], Sequence[float]
-]
+VectorLike: TypeAlias = (
+    Vector | tuple[float, float] | tuple[float, float, float] | Sequence[float]
+)
+"""
+VectorLike: Represents a position in space.
+
+- `Vector`: A vector object from `build123d`.
+- `tuple[float, float]`: A 2D coordinate (x, y).
+- `tuple[float, float, float]`: A 3D coordinate (x, y, z).
+- `Sequence[float]`: A general sequence of floats (e.g., for higher dimensions).
+"""
 
 
 class AxisMeta(type):
@@ -1761,8 +1756,13 @@ class Rotation(Location):
 
 Rot = Rotation  # Short form for Algebra users who like compact notation
 
-#:TypeVar("RotationLike"): Three tuple of angles about x, y, z or Rotation
-RotationLike = Union[tuple[float, float, float], Rotation]
+RotationLike: TypeAlias = Rotation | tuple[float, float, float]
+"""
+RotationLike: Represents a rotation.
+
+- `Rotation`: A specialized `Location` with the orientation set.
+- `tuple[float, float, float]`: Euler rotations about the X, Y, and Z axes.
+"""
 
 
 class Pos(Location):
