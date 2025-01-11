@@ -59,7 +59,58 @@ from OCP.XSControl import XSControl_WorkSession
 from build123d.build_common import UNITS_PER_METER
 from build123d.build_enums import PrecisionMode, Unit
 from build123d.geometry import Location
-from build123d.topology import Compound, Curve, Part, Shape, Sketch
+from build123d.topology import Compound, Curve, Part, Shape, Face, Shell, Sketch
+
+from OCP.XCAFDoc import XCAFDoc_VisMaterial, XCAFDoc_VisMaterialCommon
+from OCP.Quantity import Quantity_TypeOfColor
+
+
+class CommonMaterial:
+    def __init__(
+        self,
+        diffuse: tuple[float, float, float] = None,
+        specular: tuple[float, float, float] = None,
+        emissive: tuple[float, float, float] = None,
+        shininess: float = None,
+        transparency: float = None,
+    ):
+        self.diffuse = diffuse 
+        self.specular = specular 
+        self.emissive = emissive 
+        self.shininess = shininess
+        self.transparency = transparency
+
+    def build(self):
+        common = XCAFDoc_VisMaterialCommon()
+        if self.diffuse:
+            common.DiffuseColor.SetValues(*self.diffuse, Quantity_TypeOfColor.Quantity_TOC_RGB)
+        if self.specular:
+            common.SpecularColor.SetValues(*self.specular, Quantity_TypeOfColor.Quantity_TOC_RGB)
+        if self.emissive:
+            common.EmissiveColor.SetValues(*self.emissive, Quantity_TypeOfColor.Quantity_TOC_RGB)
+        if self.shininess:
+            common.Shininess = self.shininess
+        if self.transparency:
+            common.Transparency = self.transparency
+        common.IsDefined = True
+        return common 
+
+class Material:
+    def __init__(self, base_color: tuple[float, float, float] = None, common_material = None, pbr_material = None):
+        self.base_color = base_color
+        self.common_material = common_material
+        self.pbr_material = pbr_material
+
+    def build(self):
+        material = XCAFDoc_VisMaterial()
+        if self.base_color:
+            material.BaseColor().SetValues(*self.base_color)
+        if self.common_material:
+            material.SetCommonMaterial(self.common_material.build())
+        if self.pbr_material:
+            material.SetPbrMaterial(self.pbr_material.build())
+
+        return material
 
 
 def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
@@ -99,6 +150,14 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
     # Get the tools for handling shapes & colors section of the XCAF document.
     shape_tool = XCAFDoc_DocumentTool.ShapeTool_s(doc.Main())
     color_tool = XCAFDoc_DocumentTool.ColorTool_s(doc.Main())
+    visual_material_tool = XCAFDoc_DocumentTool.VisMaterialTool_s(doc.Main())
+    material_map = {}
+    #if materials:
+    #    for material in materials:
+    #        name, visual_material = material
+    #        material_map[name] = visual_material_tool.AddMaterial(
+    #            visual_material.build(), TCollection_AsciiString(name)
+    #        )
     # shape_tool.SetAutoNaming_s(True)
 
     # Add all the shapes in the b3d object either as a single object or assembly
@@ -120,12 +179,18 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
             sub_nodes = []
             if isinstance(node, Part):
                 explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_SOLID)
+            elif isinstance(node, Shell):
+                explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_SHELL)
             elif isinstance(node, Sketch):
+                explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_FACE)
+            elif isinstance(node, Face):
                 explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_FACE)
             elif isinstance(node, Curve):
                 explorer = TopExp_Explorer(node.wrapped, ta.TopAbs_EDGE)
             else:
-                warnings.warn("Unknown Compound type, color not set", stacklevel=2)
+                warnings.warn(
+                    f"Unknown Compound type ({node}), color not set", stacklevel=2
+                )
                 explorer = TopExp_Explorer()  # don't know what to look for
 
             while explorer.More():
@@ -146,7 +211,19 @@ def _create_xde(to_export: Shape, unit: Unit = Unit.MM) -> TDocStd_Document:
                 color_tool.SetColor(
                     label, node.color.wrapped, XCAFDoc_ColorType.XCAFDoc_ColorSurf
                 )
+        if material := getattr(node, "material", None):
+            material_name, visual_material = material
+            if material_name not in material_map:
+                name, visual_material = material
+                material_map[name] = visual_material_tool.AddMaterial(
+                    visual_material.build(), TCollection_AsciiString(name)
+                )
+            material_handle = material_map[material_name]
 
+            for label in [node_label] + sub_node_labels:
+                if label.IsNull():
+                    continue  # Only valid labels can be set
+                visual_material_tool.SetShapeMaterial(label, material_handle)
     shape_tool.UpdateAssemblies()
 
     # print(f"Is document valid: {XCAFDoc_DocumentTool.IsXCAFDocument_s(doc)}")
