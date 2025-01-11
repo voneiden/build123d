@@ -50,12 +50,10 @@ import functools
 from abc import ABC, abstractmethod
 from itertools import product
 from math import sqrt, cos, pi
-from typing import Any, Optional, Union, TypeVar
+from typing import Any, Type, TypeVar
 
 from collections.abc import Callable, Iterable
-from typing_extensions import Self, ParamSpec
-
-from typing import Concatenate
+from typing_extensions import Self
 
 from build123d.build_enums import Align, Mode, Select, Unit
 from build123d.geometry import (
@@ -203,13 +201,18 @@ class Builder(ABC):
     # Abstract class variables
     _tag = "Builder"
     _obj_name = "None"
-    _shape = None
-    _sub_class = None
+    _shape: Shape  # The type of the shape the builder creates
+    _sub_class: Curve | Sketch | Part  # The class of the shape the builder creates
 
     @property
     @abstractmethod
     def _obj(self) -> Shape:
         """Object to pass to parent"""
+        raise NotImplementedError  # pragma: no cover
+
+    @_obj.setter
+    @abstractmethod
+    def _obj(self, value: Part) -> None:
         raise NotImplementedError  # pragma: no cover
 
     @property
@@ -236,7 +239,6 @@ class Builder(ABC):
         assert current_frame is not None
         assert current_frame.f_back is not None
         self._python_frame = current_frame.f_back.f_back
-        self._python_frame_code = self._python_frame.f_code
         self.parent_frame = None
         self.builder_parent = None
         self.lasts: dict = {Vertex: [], Edge: [], Face: [], Solid: []}
@@ -310,14 +312,14 @@ class Builder(ABC):
         logger.info("Exiting %s", type(self).__name__)
 
     @abstractmethod
-    def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane = None):
+    def _add_to_pending(self, *objects: Edge | Face, face_plane: Plane | None = None):
         """Integrate a sequence of objects into existing builder object"""
         return NotImplementedError  # pragma: no cover
 
     @classmethod
     def _get_context(
         cls, caller: Builder | Shape | Joint | str | None = None, log: bool = True
-    ) -> Self:
+    ) -> Builder | None:
         """Return the instance of the current builder"""
         result = cls._current.get(None)
         context_name = "None" if result is None else type(result).__name__
@@ -432,7 +434,7 @@ class Builder(ABC):
                     len(typed[self._shape]),
                     mode,
                 )
-
+                combined: Shape | list[Shape] | None
                 if mode == Mode.ADD:
                     if self._obj is None:
                         if len(typed[self._shape]) == 1:
@@ -454,12 +456,20 @@ class Builder(ABC):
                 elif mode == Mode.REPLACE:
                     combined = self._sub_class(list(typed[self._shape]))
 
+                if combined is None:  # empty intersection result
+                    self._obj = self._sub_class()
+                elif isinstance(
+                    combined, list
+                ):  # If the boolean operation created a list, convert back
+                    self._obj = self._sub_class(combined)
+                else:
+                    self._obj = combined
                 # If the boolean operation created a list, convert back
-                self._obj = (
-                    self._sub_class(combined)
-                    if isinstance(combined, list)
-                    else combined
-                )
+                # self._obj = (
+                #     self._sub_class(combined)
+                #     if isinstance(combined, list)
+                #     else combined
+                # )
 
                 if self._obj is not None and clean:
                     self._obj = self._obj.clean()
@@ -720,7 +730,10 @@ class Builder(ABC):
             )
         return all_solids[0]
 
-    def _shapes(self, obj_type: Vertex | Edge | Face | Solid = None) -> ShapeList:
+    def _shapes(
+        self,
+        obj_type: Type[Vertex] | Type[Edge] | Type[Face] | Type[Solid] | None = None,
+    ) -> ShapeList:
         """Extract Shapes"""
         obj_type = self._shape if obj_type is None else obj_type
         if obj_type == Vertex:
@@ -736,7 +749,7 @@ class Builder(ABC):
         return result
 
     def validate_inputs(
-        self, validating_class, objects: Shape | Iterable[Shape] = None
+        self, validating_class, objects: Shape | Iterable[Shape] | None = None
     ):
         """Validate that objects/operations and parameters apply"""
 
@@ -786,15 +799,15 @@ class Builder(ABC):
 
     def __add__(self, _other) -> Self:
         """Invalid add"""
-        self._invalid_combine()
+        return self._invalid_combine()
 
     def __sub__(self, _other) -> Self:
         """Invalid sub"""
-        self._invalid_combine()
+        return self._invalid_combine()
 
     def __and__(self, _other) -> Self:
         """Invalid and"""
-        self._invalid_combine()
+        return self._invalid_combine()
 
     def __getattr__(self, name):
         """The user is likely trying to reference the builder's object"""
@@ -805,7 +818,7 @@ class Builder(ABC):
 
 
 def validate_inputs(
-    context: Builder, validating_class, objects: Iterable[Shape] = None
+    context: Builder, validating_class, objects: Iterable[Shape] | None = None
 ):
     """A function to wrap the method when used outside of a Builder context"""
     if context is None:
@@ -1034,7 +1047,7 @@ class PolarLocations(LocationList):
         if count < 1:
             raise ValueError(f"At least 1 elements required, requested {count}")
         if count == 1:
-            angle_step = 0
+            angle_step = 0.0
         else:
             angle_step = angular_range / (count - int(endpoint))
 
@@ -1079,7 +1092,7 @@ class Locations(LocationList):
             | Face
             | Plane
             | Axis
-            | Iterable[VectorLike, Vertex, Location, Face, Plane, Axis]
+            | Iterable[VectorLike | Vertex | Location | Face | Plane | Axis]
         ),
     ):
         local_locations = []
@@ -1302,31 +1315,54 @@ class WorkplaneList:
                 points_per_workplane.extend(localized_pts)
 
         if len(points_per_workplane) == 1:
-            result = points_per_workplane[0]
-        else:
-            result = points_per_workplane
-        return result
+            return points_per_workplane[0]
+        return points_per_workplane
 
 
-P = ParamSpec("P")
+# Type variable representing the return type of the wrapped function
 T2 = TypeVar("T2")
 
 
 def __gen_context_component_getter(
-    func: Callable[Concatenate[Builder, P], T2],
-) -> Callable[P, T2]:
+    func: Callable[[Builder, Select], T2]
+) -> Callable[[Select], T2]:
+    """
+    Wraps a Builder method to automatically provide the Builder context.
+
+    This function creates a wrapper around the provided Builder method (`func`) that
+    automatically retrieves the current Builder context and passes it as the first
+    argument to the method. This allows the method to be called without explicitly
+    providing the Builder context.
+
+    Args:
+        func (Callable[[Builder, Select], T2]): The Builder method to be wrapped.
+            - The method must take a `Builder` instance as its first argument and
+              a `Select` instance as its second argument.
+
+    Returns:
+        Callable[[Select], T2]: A callable that takes only a `Select` argument and
+        internally retrieves the Builder context to call the original method.
+
+    Raises:
+        RuntimeError: If no Builder context is available when the returned function
+        is called.
+    """
+
     @functools.wraps(func)
-    def getter(select: Select = Select.ALL):
+    def getter(select: Select = Select.ALL) -> T2:
+        # Retrieve the current Builder context based on the method name
         context = Builder._get_context(func.__name__)
         if not context:
             raise RuntimeError(
                 f"{func.__name__}() requires a Builder context to be in scope"
             )
+        # Call the original method with the retrieved context and provided select
         return func(context, select)
 
     return getter
 
 
+# The following functions are used to get the shapes from the builder in context
 vertices = __gen_context_component_getter(Builder.vertices)
 edges = __gen_context_component_getter(Builder.edges)
 wires = __gen_context_component_getter(Builder.wires)
